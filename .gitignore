@@ -1,0 +1,23 @@
+.build/
+
+*.xcodeproj
+.DS_Store
+
+# because claude (and it's skills) is/are actually the best pair programmer(s)
+.impeccable/
+.claude/
+.superpowers/
+
+.vscode
+
+# No spoilers ٩(^‿^)۶
+plan.md
+
+# macOS / Swift
+.DS_Store
+.swiftpm/
+DerivedData/
+*.app
+
+# scratch / local data
+*.log
