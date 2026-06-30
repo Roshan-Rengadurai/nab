@@ -15,9 +15,9 @@ const sans = Inter({
 });
 
 export const metadata: Metadata = {
-  title: "Nab — Nab it. It's already on your clipboard.",
+  title: "Nab",
   description:
-    "A menubar macOS utility that turns a capture into a clean link on your clipboard — hosted in your own object storage. Bring your own bucket. We never see your bytes.",
+    "A menubar macOS utility that turns a capture into a clean link on your clipboard — hosted either in your own object storage or on our own website. Bring your own bucket. We can never see your stuff.",
 };
 
 export default function RootLayout({
