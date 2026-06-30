@@ -27,3 +27,5 @@ DerivedData/
 
 # Vercel (repo-root link used when deploying web/ from here)
 .vercel
+build/
+Nab-*.zip
