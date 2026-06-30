@@ -1,6 +1,6 @@
 # Nab
 
-Take a screenshot, get a clean link on your clipboard. The twist, and the whole reason Nab exists: the file lands in a storage bucket *you* own, not on some server we run. There is no server we run (yet...).
+Take a screenshot, get a clean link on your clipboard. The twist, and the whole reason Nab exists: the file lands in a storage bucket *you* (can) own, or maybe our own server if you trust us with your data.
 
 Nab is a small macOS menubar app. You press a shortcut, drag a region, and a shareable URL is sitting on your clipboard before you've finished letting go of the mouse. The bytes go straight to your bucket over a presigned upload. Cloudflare R2, AWS S3, Backblaze B2, MinIO, anything that speaks the S3 API works. No account on our end, nothing proxying your files, no monthly storage bill from us.
 
