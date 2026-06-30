@@ -87,11 +87,7 @@ Nab asks only when you turn on a feature that needs it, and it degrades quietly 
 
 The path is short on purpose. Nab reads the bytes, picks a random unguessable object key, and computes the final public URL right then. Because it controls the key, it knows the link before uploading a single byte, so the clipboard write can happen first. It signs a short-lived PUT URL locally with your Keychain credentials, sends the bytes straight to your bucket, and records the result in local history. For a 300 KB screenshot on a decent connection, the whole thing feels instant.
 
-## Project status
-
-This is early, and honest about it. The core capture-to-clipboard flow works and is tested. Some things on the roadmap aren't built yet: history holds the record locally but doesn't delete the remote object, launch-at-login only registers once the app is packaged as a proper bundle, and history is stored as JSON rather than SQLite. The website talks about a hosted option; the code in this repo is the bring-your-own-bucket client, which is the part that actually exists today.
-
-If something is rough, that's probably why. Patches are very welcome!
+**Patches are very welcome!**
 
 
 
