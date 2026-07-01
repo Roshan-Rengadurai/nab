@@ -157,6 +157,9 @@ struct GeneralPane: View {
             ToggleRow(title: "Hold ⇧ for a raw share",
                       subtitle: "⇧ + ⌃⌃ skips the styled window and shares plain text",
                       isOn: $settings.shiftRawShare)
+            ToggleRow(title: "Tap ⌘⌃ twice to copy image",
+                      subtitle: "Copies the captured image directly — no upload, no link",
+                      isOn: $settings.cmdCtrlCopyImage)
             SliderRow(title: "Max gap between taps", value: $settings.doubleCmdGap,
                       range: 150...600, step: 25, valueLabel: "\(Int(settings.doubleCmdGap)) ms")
         }

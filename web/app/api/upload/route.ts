@@ -27,7 +27,7 @@ export const maxDuration = 60;
 
 export async function POST(request: Request) {
   // Rate limit first — cheapest rejection, blocks floods before any work.
-  const rl = rateLimit(`upload:${clientIp(request)}`, LIMITS);
+  const rl = await rateLimit(`upload:${clientIp(request)}`, LIMITS);
   if (!rl.ok) {
     return NextResponse.json(
       { error: "Rate limit exceeded" },

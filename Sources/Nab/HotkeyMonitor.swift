@@ -12,6 +12,8 @@ final class HotkeyMonitor {
     var onCommandDouble: ((Bool) -> Void)?
     /// Fired on double-⌃. Bool = was Shift held on the second tap.
     var onControlDouble: ((Bool) -> Void)?
+    /// Fired on double-tap of ⌘+⌃ chord held simultaneously.
+    var onCommandControlDouble: (() -> Void)?
     /// Max seconds between the two taps (read live from settings).
     var gapProvider: () -> TimeInterval = { 0.3 }
 
@@ -21,6 +23,7 @@ final class HotkeyMonitor {
     private struct ModState { var wasDown = false; var armed = false; var last: CFAbsoluteTime = 0 }
     private var cmd = ModState()
     private var ctrl = ModState()
+    private var cmdCtrl = ModState()
 
     var isRunning: Bool { tap != nil }
 
@@ -58,6 +61,7 @@ final class HotkeyMonitor {
         source = nil
         cmd = ModState()
         ctrl = ModState()
+        cmdCtrl = ModState()
     }
 
     private func handle(type: CGEventType, event: CGEvent) {
@@ -68,6 +72,7 @@ final class HotkeyMonitor {
         if type == .keyDown {
             cmd.armed = false
             ctrl.armed = false
+            cmdCtrl.armed = false
             return
         }
         guard type == .flagsChanged else { return }
@@ -78,6 +83,26 @@ final class HotkeyMonitor {
                 flags: flags, state: &cmd, fire: onCommandDouble)
         process(modifier: .maskControl, others: [.maskCommand, .maskAlternate],
                 flags: flags, state: &ctrl, fire: onControlDouble)
+        processChord(flags: flags, state: &cmdCtrl, fire: onCommandControlDouble)
+    }
+
+    /// Fires when Cmd+Ctrl are held together (no Option) and that chord is
+    /// pressed twice within the gap window.
+    private func processChord(flags: CGEventFlags, state: inout ModState, fire: (() -> Void)?) {
+        let chordDown = flags.contains(.maskCommand) && flags.contains(.maskControl)
+            && !flags.contains(.maskAlternate)
+        if chordDown && !state.wasDown {
+            let now = CFAbsoluteTimeGetCurrent()
+            if state.armed, now - state.last <= gapProvider() {
+                state.armed = false
+                DispatchQueue.main.async { fire?() }
+            } else {
+                state.armed = true
+            }
+            state.last = now
+        }
+        if flags.contains(.maskAlternate) { state.armed = false }
+        state.wasDown = chordDown
     }
 
     private func process(modifier: CGEventFlags, others: CGEventFlags,

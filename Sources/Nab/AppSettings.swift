@@ -72,6 +72,7 @@ final class AppSettings: ObservableObject {
     // Shortcut (tap ⌘ twice)
     @Published var shortcutEnabled: Bool { didSet { d.set(shortcutEnabled, forKey: "shortcutEnabled") } }
     @Published var doubleCmdGap: Double { didSet { d.set(doubleCmdGap, forKey: "doubleCmdGap") } } // ms
+    @Published var cmdCtrlCopyImage: Bool { didSet { d.set(cmdCtrlCopyImage, forKey: "cmdCtrlCopyImage") } }
 
     // Notifications (toast)
     @Published var toastPosition: String { didSet { d.set(toastPosition, forKey: "toastPosition") } }
@@ -106,6 +107,7 @@ final class AppSettings: ObservableObject {
         defaultBurner = d.bool(forKey: "defaultBurner")
         shortcutEnabled = d.object(forKey: "shortcutEnabled") as? Bool ?? true
         doubleCmdGap = d.object(forKey: "doubleCmdGap") as? Double ?? 300
+        cmdCtrlCopyImage = d.object(forKey: "cmdCtrlCopyImage") as? Bool ?? false
         toastPosition = d.string(forKey: "toastPosition") ?? "topTrailing"
         toastDuration = d.object(forKey: "toastDuration") as? Double ?? 2.2
         toastFollowCursor = d.bool(forKey: "toastFollowCursor")

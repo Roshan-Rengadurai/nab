@@ -55,8 +55,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
             let raw = shiftHeld && self.settings.shiftRawShare
             self.shareText(raw: raw)
         }
-        Publishers.CombineLatest(settings.$shortcutEnabled, settings.$textShareEnabled)
-            .sink { [weak self] _, _ in self?.applyHotkeys() }
+        hotkey.onCommandControlDouble = { [weak self] in
+            guard let self, !self.isOnboarding, self.settings.cmdCtrlCopyImage else { return }
+            self.captureToClipboard()
+        }
+        Publishers.CombineLatest3(settings.$shortcutEnabled, settings.$textShareEnabled, settings.$cmdCtrlCopyImage)
+            .sink { [weak self] _, _, _ in self?.applyHotkeys() }
             .store(in: &cancellables)
 
         // Launch at login.
@@ -78,7 +82,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
     // MARK: - Hotkey / Accessibility
 
     private func applyHotkeys() {
-        let wantTap = settings.shortcutEnabled || settings.textShareEnabled
+        let wantTap = settings.shortcutEnabled || settings.textShareEnabled || settings.cmdCtrlCopyImage
         guard wantTap else { hotkey.stop(); axPollTimer?.invalidate(); return }
         if hotkey.start() { return }
         let opts = [kAXTrustedCheckOptionPrompt.takeUnretainedValue() as String: true] as CFDictionary
@@ -173,6 +177,30 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
     // MARK: - Capture → upload
 
     @objc private func captureRegion() { capture(shift: false) }
+
+    /// Capture a region and copy the image directly to the clipboard — no upload.
+    private func captureToClipboard() {
+        let fmt = settings.captureFormat == "jpg" ? "jpg" : "png"
+        let tmp = FileManager.default.temporaryDirectory
+            .appendingPathComponent("nab-\(UUID().uuidString).\(fmt)")
+
+        let proc = Process()
+        proc.executableURL = URL(fileURLWithPath: "/usr/sbin/screencapture")
+        proc.arguments = ["-i", "-t", fmt, "-o", tmp.path]
+        do { try proc.run(); proc.waitUntilExit() } catch {
+            showToast(.error, "Capture failed — \(error.localizedDescription)")
+            return
+        }
+        guard let data = try? Data(contentsOf: tmp), !data.isEmpty else { return }
+        defer { try? FileManager.default.removeItem(at: tmp) }
+
+        guard let image = NSImage(data: data) else { return }
+        let pb = NSPasteboard.general
+        pb.clearContents()
+        pb.writeObjects([image])
+        if settings.soundOnSuccess { NSSound(named: "Glass")?.play() }
+        showToast(.success, "Image copied to clipboard")
+    }
 
     /// Capture a region and upload. Holding ⇧ during the gesture copies the raw
     /// image link (embeds inline in Discord); without ⇧ you get the preview-card
