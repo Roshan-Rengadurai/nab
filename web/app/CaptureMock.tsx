@@ -139,9 +139,13 @@ export default function CaptureMock() {
           }}
         />
 
-        {/* the selection marquee */}
+        {/* the selection marquee — settles to a solid border once captured */}
         <div
-          className="marquee pointer-events-none absolute rounded-[3px] border-2 border-dashed border-orange bg-orange/10"
+          className={`marquee pointer-events-none absolute rounded-[3px] border-2 bg-orange/10 ${
+            captured
+              ? "border-solid border-green"
+              : "border-dashed border-orange"
+          }`}
           style={{
             left: `${ORIGIN_X}%`,
             top: `${ORIGIN_Y}%`,
@@ -151,16 +155,26 @@ export default function CaptureMock() {
         >
           {/* dimension badge */}
           <span
-            className="absolute -top-6 left-0 whitespace-nowrap rounded bg-orange px-1.5 py-0.5 font-mono text-[10px] font-semibold text-bg0-hard transition-opacity duration-200"
+            className={`absolute -top-6 left-0 whitespace-nowrap rounded px-1.5 py-0.5 font-mono text-[10px] font-semibold text-bg0-hard transition-colors duration-300 ${
+              captured ? "bg-green" : "bg-orange"
+            }`}
             style={{ opacity: open ? 1 : 0 }}
           >
             {shot.label}
           </span>
           {/* corner handles */}
-          <span className="absolute -left-[3px] -top-[3px] h-2 w-2 rounded-[1px] bg-orange" />
-          <span className="absolute -right-[3px] -top-[3px] h-2 w-2 rounded-[1px] bg-orange" />
-          <span className="absolute -bottom-[3px] -left-[3px] h-2 w-2 rounded-[1px] bg-orange" />
-          <span className="absolute -bottom-[3px] -right-[3px] h-2 w-2 rounded-[1px] bg-orange" />
+          <span
+            className={`absolute -left-[3px] -top-[3px] h-2 w-2 rounded-[1px] transition-colors duration-300 ${captured ? "bg-green" : "bg-orange"}`}
+          />
+          <span
+            className={`absolute -right-[3px] -top-[3px] h-2 w-2 rounded-[1px] transition-colors duration-300 ${captured ? "bg-green" : "bg-orange"}`}
+          />
+          <span
+            className={`absolute -bottom-[3px] -left-[3px] h-2 w-2 rounded-[1px] transition-colors duration-300 ${captured ? "bg-green" : "bg-orange"}`}
+          />
+          <span
+            className={`absolute -bottom-[3px] -right-[3px] h-2 w-2 rounded-[1px] transition-colors duration-300 ${captured ? "bg-green" : "bg-orange"}`}
+          />
         </div>
 
         {/* the cross cursor at the drag handle */}
@@ -191,19 +205,26 @@ export default function CaptureMock() {
           </svg>
         </div>
 
-        {/* capture flash */}
-        <div
-          key={captured ? `flash-${i}` : "noflash"}
-          className={`pointer-events-none absolute inset-0 bg-fg0 ${
-            captured ? "animate-flash" : "opacity-0"
-          }`}
-        />
       </div>
 
-      {/* toast */}
-      <div className="flex items-center gap-3 border-t border-bg1 bg-bg0 px-4 py-3">
+      {/* toast — the confirmation moment. A soft success wash sweeps the row on
+          capture, and the whole strip lifts in, so the "copied" state reads
+          without a blinding full-screen flash. */}
+      <div
+        key={captured ? `toast-${i}` : "toast-idle"}
+        className={`relative flex items-center gap-3 overflow-hidden border-t border-bg1 bg-bg0 px-4 py-3 ${
+          captured ? "animate-toast-in" : ""
+        }`}
+      >
+        {/* success wash — bounded to the toast strip, fully fades */}
+        <div
+          key={captured ? `wash-${i}` : "nowash"}
+          className={`pointer-events-none absolute inset-0 bg-green/10 ${
+            captured ? "animate-wash" : "opacity-0"
+          }`}
+        />
         <span
-          className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full font-mono text-sm transition-colors ${
+          className={`relative flex h-7 w-7 shrink-0 items-center justify-center rounded-full font-mono text-sm transition-colors duration-300 ${
             captured ? "bg-green/15 text-green" : "bg-bg2/60 text-gray"
           }`}
         >
@@ -211,7 +232,7 @@ export default function CaptureMock() {
             {captured ? "✓" : "⣿"}
           </span>
         </span>
-        <div className="min-w-0 font-mono text-xs">
+        <div className="relative min-w-0 font-mono text-xs">
           <div className="text-fg3">
             {captured ? "copied to clipboard" : "drag to select a region"}
           </div>
@@ -222,7 +243,7 @@ export default function CaptureMock() {
             nab.sh/<span className="text-orange">{shot.id}</span>.png
           </div>
         </div>
-        <div className="ml-auto hidden shrink-0 items-center gap-1.5 sm:flex">
+        <div className="relative ml-auto hidden shrink-0 items-center gap-1.5 sm:flex">
           <span className="font-mono text-[10px] text-gray">double-tap</span>
           <Kbd>⌘</Kbd>
         </div>

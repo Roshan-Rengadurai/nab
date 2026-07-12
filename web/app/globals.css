@@ -1,4 +1,8 @@
 @import "tailwindcss";
+@import "tw-animate-css";
+@import "shadcn/tailwind.css";
+
+@custom-variant dark (&:is(.dark *));
 
 /* ── Gruvbox-warm dark design tokens ─────────────────────────────────────── */
 @theme {
@@ -28,6 +32,34 @@
 
 :root {
   color-scheme: dark;
+  /* shadcn semantic tokens, mapped onto the gruvbox palette above so
+     shadcn/ui primitives (Tabs, Tooltip, etc.) inherit the site's look
+     instead of the default neutral theme. */
+  --background: var(--color-bg0);
+  --foreground: var(--color-fg1);
+  --card: var(--color-bg0-hard);
+  --card-foreground: var(--color-fg1);
+  --popover: var(--color-bg0-hard);
+  --popover-foreground: var(--color-fg1);
+  --primary: var(--color-orange);
+  --primary-foreground: var(--color-bg0-hard);
+  --secondary: var(--color-bg1);
+  --secondary-foreground: var(--color-fg1);
+  --muted: var(--color-bg1);
+  --muted-foreground: var(--color-gray);
+  --accent: var(--color-bg2);
+  --accent-foreground: var(--color-fg0);
+  --destructive: var(--color-red);
+  --border: var(--color-bg2);
+  --input: var(--color-bg2);
+  --ring: var(--color-orange);
+  --radius: 0.625rem;
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
 }
 
 html {
@@ -127,6 +159,15 @@ p {
   animation: rise 0.7s cubic-bezier(0.16, 1, 0.3, 1) both;
 }
 
+/* Staggered entrance for a set of siblings (hero blocks, feature cards).
+   Each item sets `--i`; the delay cascades off it. The animation enhances an
+   already-visible default: it ends at opacity 1 with `forwards`, so if it never
+   runs (no JS, hidden tab) the content is still fully visible — never gated. */
+.stagger-item {
+  animation: rise 0.7s cubic-bezier(0.16, 1, 0.3, 1) both;
+  animation-delay: calc(var(--i, 0) * 90ms);
+}
+
 /* ── Capture-mock animation ──────────────────────────────────────────────── */
 /* The marquee and crosshair glide as the region drags out. */
 .marquee {
@@ -141,14 +182,23 @@ p {
     opacity 0.3s ease;
 }
 
-/* Soft warm flash when the shot is taken (no blinding white). */
-@keyframes flash {
+/* Success wash sweeps the toast strip once on capture, then clears. */
+@keyframes wash {
   0% { opacity: 0; }
-  35% { opacity: 0.16; }
+  30% { opacity: 1; }
   100% { opacity: 0; }
 }
-.animate-flash {
-  animation: flash 0.4s ease-out;
+.animate-wash {
+  animation: wash 0.9s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+}
+
+/* The toast strip lifts in when the capture lands. */
+@keyframes toast-in {
+  from { transform: translateY(6px); }
+  to { transform: translateY(0); }
+}
+.animate-toast-in {
+  animation: toast-in 0.4s cubic-bezier(0.16, 1, 0.3, 1) both;
 }
 
 /* The success check pops in. */
@@ -214,12 +264,27 @@ p {
   transform: translateY(0);
 }
 
+/* ── Card hover ──────────────────────────────────────────────────────────── */
+.card-lift {
+  transition:
+    transform 0.3s cubic-bezier(0.16, 1, 0.3, 1),
+    border-color 0.3s ease,
+    background-color 0.3s ease,
+    box-shadow 0.3s ease;
+}
+.card-lift:hover {
+  transform: translateY(-3px);
+  border-color: var(--color-bg3);
+  background-color: var(--color-bg0-hard);
+  box-shadow: 0 18px 40px -24px rgba(0, 0, 0, 0.7);
+}
+
 /* ── Button hover ────────────────────────────────────────────────────────── */
 .btn-lift {
   position: relative;
   overflow: hidden;
   transition:
-    transform 0.2s ease,
+    transform 0.2s cubic-bezier(0.16, 1, 0.3, 1),
     box-shadow 0.2s ease,
     background-color 0.2s ease,
     border-color 0.2s ease,
@@ -227,6 +292,11 @@ p {
 }
 .btn-lift:hover {
   transform: translateY(-2px);
+}
+/* Tactile press — settles back down on click. */
+.btn-lift:active {
+  transform: translateY(0);
+  transition-duration: 0.08s;
 }
 /* Primary buttons add a glow + a light sweep. */
 .btn-glow:hover {
@@ -255,11 +325,21 @@ p {
   html { scroll-behavior: auto; }
   .animate-blink,
   .animate-rise,
-  .animate-flash,
+  .animate-wash,
+  .animate-toast-in,
   .animate-pop,
   .text-shimmer,
-  .text-underline-draw {
+  .text-underline-draw,
+  .stagger-item {
     animation: none;
+  }
+  /* Keep captured-state confirmation legible without the wash sweep. */
+  .animate-wash {
+    opacity: 0;
+  }
+  .stagger-item {
+    opacity: 1;
+    transform: none;
   }
   .reveal {
     opacity: 1;
@@ -276,7 +356,33 @@ p {
   .crosshair-line {
     transition: none;
   }
-  .btn-lift:hover {
+  .btn-lift:hover,
+  .card-lift:hover {
     transform: none;
   }
+}
+
+@theme inline {
+  --color-ring: var(--ring);
+  --color-input: var(--input);
+  --color-border: var(--border);
+  --color-destructive: var(--destructive);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-accent: var(--accent);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-muted: var(--muted);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-secondary: var(--secondary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-primary: var(--primary);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-popover: var(--popover);
+  --color-card-foreground: var(--card-foreground);
+  --color-card: var(--card);
+  --color-foreground: var(--foreground);
+  --color-background: var(--background);
+  --radius-sm: calc(var(--radius) * 0.6);
+  --radius-md: calc(var(--radius) * 0.8);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) * 1.4);
 }

@@ -1,6 +1,8 @@
 import type { Metadata } from "next";
-import { JetBrains_Mono, Inter } from "next/font/google";
+import { JetBrains_Mono, Geist } from "next/font/google";
 import "./globals.css";
+import { cn } from "@/lib/utils";
+import { TooltipProvider } from "@/components/ui/tooltip";
 
 const mono = JetBrains_Mono({
   subsets: ["latin"],
@@ -8,11 +10,7 @@ const mono = JetBrains_Mono({
   display: "swap",
 });
 
-const sans = Inter({
-  subsets: ["latin"],
-  variable: "--font-sans",
-  display: "swap",
-});
+const geist = Geist({ subsets: ["latin"], variable: "--font-sans" });
 
 export const metadata: Metadata = {
   title: "Nab",
@@ -26,8 +24,10 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="en" className={`${mono.variable} ${sans.variable}`}>
-      <body className="antialiased">{children}</body>
+    <html lang="en" className={cn(mono.variable, "font-sans", geist.variable)}>
+      <body className="antialiased">
+        <TooltipProvider>{children}</TooltipProvider>
+      </body>
     </html>
   );
 }

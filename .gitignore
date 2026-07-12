@@ -29,3 +29,4 @@ DerivedData/
 .vercel
 build/
 Nab-*.zip
+dist/
