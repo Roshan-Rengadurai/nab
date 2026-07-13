@@ -67,13 +67,15 @@ export function clampTtl(seconds: number): number {
   );
 }
 
-/** Image MIME types accepted for hosted uploads (mirrors NabCore/ContentType). */
+/** MIME types accepted for hosted uploads (mirrors NabCore/ContentType).
+ *  text/plain is the raw text-share path — rendered by the viewer page. */
 export const ALLOWED_CONTENT_TYPES = [
   "image/png",
   "image/jpeg",
   "image/heic",
   "image/webp",
   "image/gif",
+  "text/plain",
 ];
 
 /** Per-upload size ceiling. Under Vercel's ~4.5MB request-body limit. */

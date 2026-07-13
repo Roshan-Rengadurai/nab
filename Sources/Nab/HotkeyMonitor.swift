@@ -44,7 +44,11 @@ final class HotkeyMonitor {
             callback: callback,
             userInfo: Unmanaged.passUnretained(self).toOpaque()
         ) else {
-            return false // not trusted yet
+            // tapCreate failed outright. Note: a `.listenOnly` tap is created
+            // successfully even when untrusted for Accessibility (it just won't
+            // see other apps' events), so callers must check AXIsProcessTrusted()
+            // separately — a `true` return here does not imply trust.
+            return false
         }
         self.tap = tap
         let source = CFMachPortCreateRunLoopSource(kCFAllocatorDefault, tap, 0)

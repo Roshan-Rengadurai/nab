@@ -3,136 +3,316 @@ import AppKit
 import CoreGraphics
 import ApplicationServices
 
-// MARK: - Overlay window (borderless, key-capable, full-screen)
+// MARK: - Overlay window (borderless, key-capable)
 
-/// Borderless window that can still become key so the card's buttons and the
-/// interactive keybind step receive events. Hosted full-screen by AppDelegate.
+/// Borderless window that can still become key so the gesture-guide card's
+/// button and its local key monitor receive events.
 final class OverlayWindow: NSWindow {
     override var canBecomeKey: Bool { true }
     override var canBecomeMain: Bool { true }
 }
 
-// MARK: - Onboarding (Raycast-style overlay)
+// MARK: - Welcome splash (transient, click-through, full-screen)
 
-struct OnboardingView: View {
-    @EnvironmentObject var settings: AppSettings
-    var onFinish: () -> Void
+/// A short "Welcome to Nab" moment: a frosted card that fades in gradually
+/// with the snipping mark, holds, fades out, then hands off to the windowed
+/// onboarding. The hosting window ignores mouse events, so this can never
+/// block clicks, typing, or the permission dialogs that follow.
+struct WelcomeSplash: View {
+    var onDone: () -> Void
 
-    @State private var step = 0
     @State private var appeared = false
     @State private var exiting = false
+
+    var body: some View {
+        VStack(spacing: 18) {
+            SnipMark()
+            Text("Welcome to Nab").font(.mono(30, weight: .bold)).foregroundColor(Gruv.fg0)
+            Text("Nab it. It's already on your clipboard.")
+                .font(.system(size: 14)).foregroundColor(Gruv.orange)
+        }
+        .padding(.horizontal, 56).padding(.vertical, 44)
+        .background(
+            RoundedRectangle(cornerRadius: 24, style: .continuous)
+                .fill(Gruv.bg0.opacity(0.86))
+                .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 24, style: .continuous))
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 24, style: .continuous)
+                .stroke(Color.white.opacity(0.08), lineWidth: 1))
+        .shadow(color: .black.opacity(0.5), radius: 36, y: 14)
+        .scaleEffect(exiting ? 1.04 : (appeared ? 1 : 0.92))
+        .blur(radius: appeared ? 0 : 8)
+        .opacity(exiting ? 0 : (appeared ? 1 : 0))
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .preferredColorScheme(.dark)
+        .onAppear {
+            // Gradual entrance — a slow settle, not a pop.
+            NSSound(named: "Submarine")?.play() // low hum to accompany the fade-in
+            withAnimation(.easeOut(duration: 1.2)) { appeared = true }
+            DispatchQueue.main.asyncAfter(deadline: .now() + 2.6) {
+                withAnimation(.easeIn(duration: 0.5)) { exiting = true }
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.55) { onDone() }
+            }
+        }
+    }
+}
+
+// MARK: - Gesture guide (frosted overlay, after permissions)
+
+/// The interactive shortcut walkthrough as a clean frosted card — same look
+/// as the welcome splash, but key-capable so the practice taps register.
+/// One big liquid-glass keycap in the middle per gesture (⌘ first, then ⌃):
+/// a single tap surfaces "one more time…", a double tap turns the cap green
+/// with confetti and advances. Hosted in a card-sized floating window, so the
+/// rest of the screen stays clickable while the user builds muscle memory.
+struct GestureGuideView: View {
+    @EnvironmentObject var settings: AppSettings
+    var onDone: () -> Void
+
+    @State private var appeared = false
+    @State private var exiting = false
+
+    /// 0 = ⌘ practice, 1 = ⌃ practice.
+    @State private var stage = 0
+    @State private var cmdDone = false
+    @State private var ctrlDone = false
+    @State private var oneMoreTime = false
+    @State private var hintGeneration = 0
+    @State private var confetti = 0
+    @State private var monitor: Any?
+    @State private var wasDown = false
+    @State private var lastTap = Date.distantPast
+
+    private var bothDone: Bool { cmdDone && ctrlDone }
+    private var stageDone: Bool { stage == 0 ? cmdDone : ctrlDone }
+
+    var body: some View {
+        VStack(spacing: 0) {
+            ZStack {
+                practice
+                ConfettiBurst().id(confetti)
+            }
+            .padding(.horizontal, 40).padding(.top, 32).padding(.bottom, 24)
+            HStack {
+                Text("hold ⇧ while you tap for a raw share")
+                    .font(.system(size: 11)).foregroundColor(Gruv.gray)
+                Spacer()
+                Button(bothDone ? "Done" : "Skip") { finish() }
+                    .buttonStyle(.plain)
+                    .font(.system(size: 13, weight: .semibold))
+                    .foregroundColor(bothDone ? Gruv.bg0h : Gruv.fg3)
+                    .padding(.horizontal, 18).padding(.vertical, 9)
+                    .background(RoundedRectangle(cornerRadius: 9)
+                        .fill(bothDone ? Gruv.green : Gruv.bg2))
+                    .animation(.spring(response: 0.35, dampingFraction: 0.7), value: bothDone)
+            }
+            .padding(.horizontal, 24).padding(.vertical, 14)
+            .background(Gruv.bg0h.opacity(0.6))
+        }
+        .frame(width: 440)
+        .background(
+            RoundedRectangle(cornerRadius: 24, style: .continuous)
+                .fill(Gruv.bg0.opacity(0.86))
+                .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 24, style: .continuous))
+        )
+        .clipShape(RoundedRectangle(cornerRadius: 24, style: .continuous))
+        .overlay(
+            RoundedRectangle(cornerRadius: 24, style: .continuous)
+                .stroke(Color.white.opacity(0.08), lineWidth: 1))
+        .shadow(color: .black.opacity(0.5), radius: 36, y: 14)
+        .scaleEffect(exiting ? 1.03 : (appeared ? 1 : 0.94))
+        .blur(radius: appeared ? 0 : 6)
+        .opacity(exiting ? 0 : (appeared ? 1 : 0))
+        .padding(40) // room for the shadow inside the borderless window
+        .preferredColorScheme(.dark)
+        .onAppear {
+            withAnimation(.easeOut(duration: 0.7)) { appeared = true }
+            startMonitor()
+        }
+        .onDisappear(perform: stopMonitor)
+        .onExitCommand { finish() }
+    }
+
+    // MARK: The practice stage — one big keycap, a line of text above it.
+
+    private var practice: some View {
+        VStack(spacing: 22) {
+            Text(stage == 0 ? "Tap ⌘ twice, quickly — captures a region"
+                            : "Now tap ⌃ twice — shares your selected text")
+                .font(.system(size: 13, weight: .medium)).foregroundColor(Gruv.fg3)
+                .id("hint-\(stage)")
+                .transition(.opacity)
+
+            GlassKeyCap(symbol: stage == 0 ? "command" : "control", done: stageDone)
+
+            // "one more time…" surfaces after a single tap, then fades.
+            Text(stageDone ? "got it" : "one more time…")
+                .font(.system(size: 12, weight: .semibold))
+                .foregroundColor(stageDone ? Gruv.green : Gruv.orange)
+                .opacity(stageDone || oneMoreTime ? 1 : 0)
+                .animation(.easeInOut(duration: 0.2), value: oneMoreTime)
+                .animation(.easeInOut(duration: 0.2), value: stageDone)
+        }
+        .frame(maxWidth: .infinity)
+        .animation(.spring(response: 0.45, dampingFraction: 0.8), value: stage)
+    }
+
+    // MARK: Tap detection (current stage's modifier only)
+
+    private func startMonitor() {
+        guard monitor == nil else { return }
+        monitor = NSEvent.addLocalMonitorForEvents(matching: .flagsChanged) { event in
+            handle(event); return event
+        }
+    }
+
+    private func stopMonitor() {
+        if let monitor { NSEvent.removeMonitor(monitor) }
+        monitor = nil
+    }
+
+    private func handle(_ event: NSEvent) {
+        guard !stageDone, !exiting else { return }
+        let target: NSEvent.ModifierFlags = stage == 0 ? .command : .control
+        let down = event.modifierFlags.contains(target)
+        let gap = max(0.18, settings.doubleCmdGap / 1000)
+
+        if down && !wasDown {
+            let now = Date()
+            if now.timeIntervalSince(lastTap) <= gap {
+                completeStage()
+            } else {
+                showOneMoreTime(gap: gap)
+            }
+            lastTap = now
+        }
+        wasDown = down
+    }
+
+    /// First tap of the pair: nudge the user, then fade the nudge if the
+    /// double-tap window lapses.
+    private func showOneMoreTime(gap: TimeInterval) {
+        hintGeneration += 1
+        let generation = hintGeneration
+        oneMoreTime = true
+        DispatchQueue.main.asyncAfter(deadline: .now() + gap + 0.6) {
+            if hintGeneration == generation { oneMoreTime = false }
+        }
+    }
+
+    private func completeStage() {
+        oneMoreTime = false
+        withAnimation(.spring(response: 0.4, dampingFraction: 0.6)) {
+            if stage == 0 { cmdDone = true } else { ctrlDone = true }
+        }
+        confetti += 1
+        NSSound(named: bothDone ? "Hero" : "Pop")?.play()
+        // Let the green + confetti land, then bring in the next keycap.
+        if stage == 0 {
+            DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
+                withAnimation(.spring(response: 0.45, dampingFraction: 0.8)) {
+                    stage = 1
+                    wasDown = false
+                    lastTap = .distantPast
+                }
+            }
+        }
+    }
+
+    private func finish() {
+        guard !exiting else { return }
+        stopMonitor()
+        withAnimation(.easeIn(duration: 0.35)) { exiting = true }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) { onDone() }
+    }
+}
+
+// MARK: - Liquid-glass keycap
+
+/// A big glassy key cap: frosted material with a specular sheen and hairline
+/// gradient stroke; turns green with a checkmark once its gesture lands.
+private struct GlassKeyCap: View {
+    let symbol: String
+    let done: Bool
+
+    var body: some View {
+        ZStack {
+            RoundedRectangle(cornerRadius: 34, style: .continuous)
+                .fill(done ? AnyShapeStyle(Gruv.green) : AnyShapeStyle(.ultraThinMaterial))
+            // Specular highlight across the top half.
+            RoundedRectangle(cornerRadius: 34, style: .continuous)
+                .fill(LinearGradient(colors: [.white.opacity(done ? 0.28 : 0.16), .clear],
+                                     startPoint: .top, endPoint: .center))
+            RoundedRectangle(cornerRadius: 34, style: .continuous)
+                .strokeBorder(LinearGradient(colors: [.white.opacity(0.35), .white.opacity(0.04)],
+                                             startPoint: .top, endPoint: .bottom), lineWidth: 1.5)
+            Image(systemName: done ? "checkmark" : symbol)
+                .font(.system(size: 60, weight: .medium))
+                .foregroundColor(done ? Gruv.bg0h : Gruv.fg0)
+                .id(done) // deploys back to macOS 13: swap glyphs with a transition
+                .transition(.scale.combined(with: .opacity))
+        }
+        .frame(width: 160, height: 160)
+        .shadow(color: done ? Gruv.green.opacity(0.35) : .black.opacity(0.35), radius: 18, y: 10)
+        .scaleEffect(done ? 1.06 : 1)
+        .animation(.spring(response: 0.35, dampingFraction: 0.55), value: done)
+    }
+}
+
+// MARK: - Onboarding (windowed permissions step)
+
+struct OnboardingView: View {
+    /// Continue → the gesture-guide overlay takes over.
+    var onContinue: () -> Void
+    /// Skip → onboarding ends entirely.
+    var onSkip: () -> Void
+
     @State private var screenOK = false
     @State private var axOK = false
+    @State private var listenOK = false
 
-    private let lastStep = 3
     private let poll = Timer.publish(every: 1, on: .main, in: .common).autoconnect()
 
     var body: some View {
         ZStack {
             AuroraBackground().ignoresSafeArea()
-
-            card
-                .scaleEffect(exiting ? 1.03 : (appeared ? 1 : 0.96))
-                .opacity(appeared ? 1 : 0)
+            VStack(spacing: 0) {
+                permissions
+                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+                    .padding(30)
+                footer
+            }
         }
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .opacity(exiting ? 0 : 1) // whole overlay fades out on finish
+        .frame(minWidth: 560, minHeight: 560)
         .preferredColorScheme(.dark)
-        .onAppear {
-            refreshPermissions()
-            withAnimation(.spring(response: 0.6, dampingFraction: 0.82)) { appeared = true }
-        }
+        .onAppear(perform: refreshPermissions)
         .onReceive(poll) { _ in refreshPermissions() }
-        .onExitCommand { finish() } // Esc skips
-    }
-
-    private var card: some View {
-        VStack(spacing: 0) {
-            content
-                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-                .padding(30)
-                .id(step)
-                .transition(.asymmetric(
-                    insertion: .move(edge: .trailing).combined(with: .opacity),
-                    removal: .move(edge: .leading).combined(with: .opacity)))
-            footer
-        }
-        .frame(width: 560, height: 620)
-        .background(
-            RoundedRectangle(cornerRadius: 22, style: .continuous)
-                .fill(Gruv.bg0.opacity(0.82))
-                .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 22, style: .continuous))
-        )
-        .overlay(
-            RoundedRectangle(cornerRadius: 22, style: .continuous)
-                .stroke(Color.white.opacity(0.08), lineWidth: 1))
-        .shadow(color: .black.opacity(0.55), radius: 40, y: 18)
-    }
-
-    @ViewBuilder private var content: some View {
-        switch step {
-        case 0: welcome
-        case 1: permissions
-        case 2: TryItStep()
-        default: done
-        }
+        .onExitCommand { onSkip() } // Esc skips
     }
 
     // MARK: Steps
 
-    private var welcome: some View {
-        VStack(spacing: 18) {
-            Spacer()
-            SnipMark()
-            Text("Nab").font(.mono(28, weight: .bold)).foregroundColor(Gruv.fg0)
-            Text("Nab it. It's already on your clipboard.")
-                .font(.system(size: 14)).foregroundColor(Gruv.orange)
-            Text("A menubar capture tool that drops a clean link onto your clipboard the instant you nab. Two quick steps: grant a couple of permissions, learn two gestures. Let's go.")
-                .font(.system(size: 13)).foregroundColor(Gruv.fg3)
-                .multilineTextAlignment(.center).frame(maxWidth: 400)
-            Spacer()
-        }
-        .frame(maxWidth: .infinity)
-    }
-
     private var permissions: some View {
-        VStack(alignment: .leading, spacing: 14) {
-            stepTitle("Permissions", "Two macOS permissions. Grant them here — the status updates live.")
+        let allOK = screenOK && axOK && listenOK
+        return VStack(alignment: .leading, spacing: 14) {
+            stepTitle("Permissions", "Three macOS permissions. Grant them here — the status updates live.")
+            permissionCard(
+                icon: "keyboard", tint: Gruv.orange, title: "Input Monitoring",
+                desc: "For the gestures — toggle Nab on in the list.", granted: listenOK) { requestListen() }
             permissionCard(
                 icon: "camera.viewfinder", tint: Gruv.aqua, title: "Screen Recording",
                 desc: "To capture a screen region.", granted: screenOK) { requestScreen() }
             permissionCard(
                 icon: "hand.tap.fill", tint: Gruv.yellow, title: "Accessibility",
-                desc: "For the global double-⌘ / double-⌃ gestures.", granted: axOK) { requestAX() }
-            Text(screenOK && axOK
-                 ? "Both granted — you're ready for the gestures."
+                desc: "To read your selected text for sharing.", granted: axOK) { requestAX() }
+            Text(allOK
+                 ? "All granted — you're ready for the gestures."
                  : "You can grant later too; capture still works from the menubar.")
-                .font(.system(size: 11)).foregroundColor(screenOK && axOK ? Gruv.green : Gruv.gray)
-                .animation(.easeInOut, value: screenOK && axOK)
+                .font(.system(size: 11)).foregroundColor(allOK ? Gruv.green : Gruv.gray)
+                .animation(.easeInOut, value: allOK)
             Spacer()
         }
-    }
-
-    private var done: some View {
-        ZStack {
-            VStack(spacing: 16) {
-                Spacer()
-                Image(systemName: "checkmark.circle.fill").font(.system(size: 56)).foregroundColor(Gruv.green)
-                    .scaleEffect(appeared ? 1 : 0.3)
-                Text("You're all set").font(.mono(22, weight: .bold)).foregroundColor(Gruv.fg0)
-                VStack(alignment: .leading, spacing: 8) {
-                    tip("Tap ⌘ twice", "capture a region → link copied")
-                    tip("Tap ⌃ twice", "share selected text → link copied")
-                    tip("⇧ + ⌃⌃", "share it raw — skip the styled window")
-                    tip("Menubar ✂", "actions + Settings anytime")
-                }
-                .padding(16)
-                .background(RoundedRectangle(cornerRadius: 12).fill(Gruv.bg1.opacity(0.7)))
-                Spacer()
-            }
-            ConfettiBurst().id("done-confetti")
-        }
-        .frame(maxWidth: .infinity)
     }
 
     // MARK: Pieces
@@ -147,73 +327,21 @@ struct OnboardingView: View {
 
     private func permissionCard(icon: String, tint: Color, title: String, desc: String,
                                 granted: Bool, action: @escaping () -> Void) -> some View {
-        Card {
-            HStack(spacing: 12) {
-                RoundedRectangle(cornerRadius: 8, style: .continuous).fill(granted ? Gruv.green : tint)
-                    .frame(width: 30, height: 30)
-                    .overlay(Image(systemName: granted ? "checkmark" : icon)
-                        .font(.system(size: 14, weight: .semibold)).foregroundColor(Gruv.bg0h))
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(title).font(.system(size: 13, weight: .semibold)).foregroundColor(Gruv.fg1)
-                    Text(granted ? "Granted" : desc)
-                        .font(.system(size: 11)).foregroundColor(granted ? Gruv.green : Gruv.gray)
-                }
-                Spacer()
-                if granted {
-                    Image(systemName: "checkmark.circle.fill").foregroundColor(Gruv.green).font(.system(size: 18))
-                        .transition(.scale.combined(with: .opacity))
-                } else {
-                    Button(action: action) {
-                        Text("Grant").font(.system(size: 12, weight: .medium)).foregroundColor(Gruv.orange)
-                            .padding(.horizontal, 10).padding(.vertical, 6)
-                            .background(RoundedRectangle(cornerRadius: 7).fill(Gruv.orange.opacity(0.12)))
-                    }
-                    .buttonStyle(.plain)
-                }
-            }
-        }
-        .overlay(RoundedRectangle(cornerRadius: 12, style: .continuous)
-            .stroke(granted ? Gruv.green.opacity(0.5) : .clear, lineWidth: 1.5))
-        .animation(.spring(response: 0.4, dampingFraction: 0.7), value: granted)
-    }
-
-    private func tip(_ key: String, _ desc: String) -> some View {
-        HStack(spacing: 10) {
-            Text(key).font(.mono(11, weight: .semibold)).foregroundColor(Gruv.fg0)
-                .padding(.horizontal, 8).padding(.vertical, 4)
-                .background(RoundedRectangle(cornerRadius: 6).fill(Gruv.bg2))
-            Text(desc).font(.system(size: 12)).foregroundColor(Gruv.fg3)
-            Spacer()
-        }
+        PermissionRow(icon: icon, tint: tint, title: title, subtitle: desc,
+                      granted: granted, action: action)
     }
 
     private var footer: some View {
         HStack {
-            HStack(spacing: 6) {
-                ForEach(0...lastStep, id: \.self) { i in
-                    Circle().fill(i == step ? Gruv.orange : Gruv.bg3)
-                        .frame(width: i == step ? 8 : 7, height: i == step ? 8 : 7)
-                        .animation(.spring(response: 0.3, dampingFraction: 0.6), value: step)
-                }
-            }
             Spacer()
-            if step == 0 {
-                Button("Skip") { finish() }
-                    .buttonStyle(.plain).foregroundColor(Gruv.gray).font(.system(size: 13))
-                    .padding(.horizontal, 12)
-            } else {
-                Button("Back") { withAnimation(.spring(response: 0.4, dampingFraction: 0.8)) { step -= 1 } }
-                    .buttonStyle(.plain).foregroundColor(Gruv.fg3).font(.system(size: 13))
-                    .padding(.horizontal, 12)
-            }
-            Button(step == lastStep ? "Finish" : "Continue") {
-                if step == lastStep { finish() }
-                else { withAnimation(.spring(response: 0.4, dampingFraction: 0.8)) { step += 1 } }
-            }
-            .buttonStyle(.plain)
-            .font(.system(size: 13, weight: .semibold)).foregroundColor(Gruv.bg0h)
-            .padding(.horizontal, 18).padding(.vertical, 9)
-            .background(RoundedRectangle(cornerRadius: 9).fill(Gruv.orange))
+            Button("Skip") { onSkip() }
+                .buttonStyle(.plain).foregroundColor(Gruv.gray).font(.system(size: 13))
+                .padding(.horizontal, 12)
+            Button("Continue") { onContinue() }
+                .buttonStyle(.plain)
+                .font(.system(size: 13, weight: .semibold)).foregroundColor(Gruv.bg0h)
+                .padding(.horizontal, 18).padding(.vertical, 9)
+                .background(RoundedRectangle(cornerRadius: 9).fill(Gruv.orange))
         }
         .padding(.horizontal, 24).padding(.vertical, 16)
         .background(Gruv.bg0h.opacity(0.6))
@@ -224,9 +352,25 @@ struct OnboardingView: View {
     private func refreshPermissions() {
         let s = CGPreflightScreenCaptureAccess()
         let a = AXIsProcessTrusted()
-        if s != screenOK || a != axOK {
-            withAnimation(.spring(response: 0.4, dampingFraction: 0.7)) { screenOK = s; axOK = a }
+        let l = CGPreflightListenEventAccess()
+        guard s != screenOK || a != axOK || l != listenOK else { return }
+        // A little audible feedback when a permission flips green — and a
+        // brighter chime when the last one lands.
+        let newlyGranted = (s && !screenOK) || (a && !axOK) || (l && !listenOK)
+        withAnimation(.spring(response: 0.4, dampingFraction: 0.7)) {
+            screenOK = s; axOK = a; listenOK = l
         }
+        if newlyGranted {
+            NSSound(named: s && a && l ? "Glass" : "Tink")?.play()
+        }
+    }
+
+    private func requestListen() {
+        // macOS never shows a dialog for Input Monitoring — the request only
+        // registers Nab in the list, so always take the user to the pane.
+        _ = CGRequestListenEventAccess()
+        NSWorkspace.shared.open(URL(string:
+            "x-apple.systempreferences:com.apple.preference.security?Privacy_ListenEvent")!)
     }
 
     private func requestScreen() {
@@ -244,13 +388,6 @@ struct OnboardingView: View {
         }
     }
 
-    private func finish() {
-        guard !exiting else { return }
-        settings.hasOnboarded = true
-        // Fade the whole overlay out, then tear down the window.
-        withAnimation(.easeOut(duration: 0.38)) { exiting = true }
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) { onFinish() }
-    }
 }
 
 // MARK: - Vsync-animated aurora background
@@ -328,158 +465,6 @@ private struct SnipMark: View {
                 Capsule().fill(Gruv.bg3).frame(width: 9, height: 3)
             }
         }
-    }
-}
-
-// MARK: - Interactive "try it" step
-
-private struct TryItStep: View {
-    @EnvironmentObject var settings: AppSettings
-    @State private var cmdDone = false
-    @State private var ctrlDone = false
-    @State private var sawShift = false
-    @State private var confetti = 0
-    @State private var monitor: Any?
-
-    @State private var cmdWasDown = false
-    @State private var ctrlWasDown = false
-    @State private var lastCmd = Date.distantPast
-    @State private var lastCtrl = Date.distantPast
-
-    private var bothDone: Bool { cmdDone && ctrlDone }
-
-    var body: some View {
-        ZStack {
-            VStack(alignment: .leading, spacing: 14) {
-                stepTitle
-                Text("Tap each modifier **twice, quickly** — right here. Go on, your keyboard is listening.")
-                    .font(.system(size: 13)).foregroundColor(Gruv.fg3)
-                    .fixedSize(horizontal: false, vertical: true)
-
-                gestureCard(symbol: "command", label: "Tap ⌘ twice",
-                            hint: "captures a screen region", done: cmdDone, tint: Gruv.aqua)
-                gestureCard(symbol: "control", label: "Tap ⌃ twice",
-                            hint: "shares your selected text", done: ctrlDone, tint: Gruv.yellow)
-
-                Card {
-                    HStack(spacing: 10) {
-                        Image(systemName: sawShift ? "wand.and.stars" : "shift")
-                            .font(.system(size: 13, weight: .semibold))
-                            .foregroundColor(sawShift ? Gruv.green : Gruv.gray)
-                            .frame(width: 18)
-                        VStack(alignment: .leading, spacing: 2) {
-                            Text("Pro move: hold ⇧ while you double-tap")
-                                .font(.system(size: 12, weight: .medium)).foregroundColor(Gruv.fg1)
-                            Text(sawShift
-                                 ? "Nice — that's the raw share. Skips the styled window."
-                                 : "Shares text raw, skipping Nab's styled window image.")
-                                .font(.system(size: 11)).foregroundColor(sawShift ? Gruv.green : Gruv.gray)
-                        }
-                        Spacer()
-                    }
-                }
-
-                Text(bothDone
-                     ? "You've got it. That muscle memory works everywhere — not just here."
-                     : "No uploads happen on this screen — it's just practice.")
-                    .font(.system(size: 11))
-                    .foregroundColor(bothDone ? Gruv.green : Gruv.gray)
-                    .animation(.easeInOut, value: bothDone)
-                Spacer()
-            }
-            ConfettiBurst().id(confetti)
-        }
-        .onAppear(perform: startMonitor)
-        .onDisappear(perform: stopMonitor)
-    }
-
-    private var stepTitle: some View {
-        VStack(alignment: .leading, spacing: 6) {
-            HStack(spacing: 8) {
-                Text("Try it").font(.mono(20, weight: .bold)).foregroundColor(Gruv.fg0)
-                if bothDone {
-                    Image(systemName: "checkmark.seal.fill")
-                        .foregroundColor(Gruv.green).font(.system(size: 18))
-                        .transition(.scale.combined(with: .opacity))
-                }
-            }
-            Text("The whole app is two gestures. Let's build the muscle memory now.")
-                .font(.system(size: 13)).foregroundColor(Gruv.fg3)
-        }
-        .animation(.spring(response: 0.4, dampingFraction: 0.6), value: bothDone)
-    }
-
-    private func gestureCard(symbol: String, label: String, hint: String, done: Bool, tint: Color) -> some View {
-        Card {
-            HStack(spacing: 12) {
-                ZStack {
-                    RoundedRectangle(cornerRadius: 8, style: .continuous)
-                        .fill(done ? Gruv.green : tint)
-                        .frame(width: 34, height: 34)
-                    Image(systemName: done ? "checkmark" : symbol)
-                        .font(.system(size: 15, weight: .bold))
-                        .foregroundColor(Gruv.bg0h)
-                }
-                .scaleEffect(done ? 1.08 : 1)
-                .animation(.spring(response: 0.35, dampingFraction: 0.45), value: done)
-
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(label).font(.system(size: 13, weight: .semibold)).foregroundColor(Gruv.fg1)
-                    Text(done ? "Got it — nicely done" : hint)
-                        .font(.system(size: 11)).foregroundColor(done ? Gruv.green : Gruv.gray)
-                }
-                Spacer()
-                if done {
-                    Text("✓").font(.system(size: 14, weight: .bold)).foregroundColor(Gruv.green)
-                        .transition(.scale.combined(with: .opacity))
-                }
-            }
-        }
-        .overlay(RoundedRectangle(cornerRadius: 12, style: .continuous)
-            .stroke(done ? Gruv.green.opacity(0.6) : .clear, lineWidth: 1.5))
-    }
-
-    private func startMonitor() {
-        guard monitor == nil else { return }
-        monitor = NSEvent.addLocalMonitorForEvents(matching: .flagsChanged) { event in
-            handle(event); return event
-        }
-    }
-
-    private func stopMonitor() {
-        if let monitor { NSEvent.removeMonitor(monitor) }
-        monitor = nil
-    }
-
-    private func handle(_ event: NSEvent) {
-        let f = event.modifierFlags
-        let cmd = f.contains(.command)
-        let ctrl = f.contains(.control)
-        let shift = f.contains(.shift)
-        let gap: TimeInterval = max(0.18, settings.doubleCmdGap / 1000)
-
-        if cmd && !cmdWasDown {
-            let now = Date()
-            if now.timeIntervalSince(lastCmd) <= gap, !cmdDone { complete(isCmd: true, shift: shift) }
-            lastCmd = now
-        }
-        cmdWasDown = cmd
-
-        if ctrl && !ctrlWasDown {
-            let now = Date()
-            if now.timeIntervalSince(lastCtrl) <= gap, !ctrlDone { complete(isCmd: false, shift: shift) }
-            lastCtrl = now
-        }
-        ctrlWasDown = ctrl
-    }
-
-    private func complete(isCmd: Bool, shift: Bool) {
-        withAnimation(.spring(response: 0.4, dampingFraction: 0.6)) {
-            if isCmd { cmdDone = true } else { ctrlDone = true }
-            if shift { sawShift = true }
-        }
-        confetti += 1
-        NSSound(named: "Pop")?.play()
     }
 }
 

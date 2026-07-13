@@ -170,6 +170,51 @@ struct SliderRow: View {
     }
 }
 
+// MARK: - Permission status row (live Accessibility / Screen Recording state)
+
+/// A card that reflects a macOS permission's live state: an icon chip, title,
+/// and either a green "Granted" badge or a "Grant" button. Shared by onboarding
+/// and Settings so both render identically.
+struct PermissionRow: View {
+    let icon: String
+    let tint: Color
+    let title: String
+    let subtitle: String
+    let granted: Bool
+    let action: () -> Void
+
+    var body: some View {
+        Card {
+            HStack(spacing: 12) {
+                RoundedRectangle(cornerRadius: 8, style: .continuous).fill(granted ? Gruv.green : tint)
+                    .frame(width: 30, height: 30)
+                    .overlay(Image(systemName: granted ? "checkmark" : icon)
+                        .font(.system(size: 14, weight: .semibold)).foregroundColor(Gruv.bg0h))
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(title).font(.system(size: 13, weight: .semibold)).foregroundColor(Gruv.fg1)
+                    Text(granted ? "Granted" : subtitle)
+                        .font(.system(size: 11)).foregroundColor(granted ? Gruv.green : Gruv.gray)
+                }
+                Spacer()
+                if granted {
+                    Image(systemName: "checkmark.circle.fill").foregroundColor(Gruv.green).font(.system(size: 18))
+                        .transition(.scale.combined(with: .opacity))
+                } else {
+                    Button(action: action) {
+                        Text("Grant").font(.system(size: 12, weight: .medium)).foregroundColor(Gruv.orange)
+                            .padding(.horizontal, 10).padding(.vertical, 6)
+                            .background(RoundedRectangle(cornerRadius: 7).fill(Gruv.orange.opacity(0.12)))
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
+        }
+        .overlay(RoundedRectangle(cornerRadius: 12, style: .continuous)
+            .stroke(granted ? Gruv.green.opacity(0.5) : .clear, lineWidth: 1.5))
+        .animation(.spring(response: 0.4, dampingFraction: 0.7), value: granted)
+    }
+}
+
 // MARK: - Section label above a group of cards
 
 struct GroupLabel: View {

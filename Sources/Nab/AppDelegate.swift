@@ -8,7 +8,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
     private var statusItem: NSStatusItem!
     private var settingsWindow: NSWindow?
     private var onboardingWindow: NSWindow?
-    /// While the onboarding window is up, global gestures are suppressed so the
+    /// Frosted card overlay for the interactive gesture walkthrough.
+    private var gestureGuideWindow: NSWindow?
+    /// Transient full-screen "Welcome to Nab" splash shown before the windowed
+    /// onboarding. Click-through and never key, so it can't block anything.
+    private var splashWindow: NSWindow?
+    /// While onboarding is up, global gestures are suppressed so the
     /// interactive "try it" step can practice locally without screencapture /
     /// Settings stealing focus.
     private var isOnboarding = false
@@ -19,6 +24,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
     private let hotkey = HotkeyMonitor()
     private var cancellables = Set<AnyCancellable>()
     private var axPollTimer: Timer?
+    /// One guidance toast per launch about the (unpromptable) Input Monitoring permission.
+    private var toldUserAboutInputMonitoring = false
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         // Access stored credentials (nab.credentials) up front on every launch.
@@ -46,17 +53,20 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         // Gestures.
         hotkey.gapProvider = { [weak self] in (self?.settings.doubleCmdGap ?? 300) / 1000 }
         hotkey.onCommandDouble = { [weak self] shiftHeld in
-            guard let self, !self.isOnboarding, self.settings.shortcutEnabled else { return }
+            guard let self, !self.isOnboarding, self.settings.shortcutEnabled,
+                  self.gestureAllowedInFrontmostApp() else { return }
             self.capture(shift: shiftHeld)
         }
         hotkey.onControlDouble = { [weak self] shiftHeld in
-            guard let self, !self.isOnboarding, self.settings.textShareEnabled else { return }
+            guard let self, !self.isOnboarding, self.settings.textShareEnabled,
+                  self.gestureAllowedInFrontmostApp() else { return }
             // ⇧ rides along to skip the styled window — when the setting allows it.
             let raw = shiftHeld && self.settings.shiftRawShare
             self.shareText(raw: raw)
         }
         hotkey.onCommandControlDouble = { [weak self] in
-            guard let self, !self.isOnboarding, self.settings.cmdCtrlCopyImage else { return }
+            guard let self, !self.isOnboarding, self.settings.cmdCtrlCopyImage,
+                  self.gestureAllowedInFrontmostApp() else { return }
             self.captureToClipboard()
         }
         Publishers.CombineLatest3(settings.$shortcutEnabled, settings.$textShareEnabled, settings.$cmdCtrlCopyImage)
@@ -73,7 +83,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
             self, selector: #selector(previewToast), name: .nabPreviewToast, object: nil)
 
         if settings.hasOnboarded {
-            if !settings.isConfigured { openSettings() }
+            // Only surface Settings when the active mode genuinely can't upload
+            // yet — hosted users with a license key shouldn't see it at launch.
+            if !settings.isReadyToUpload { openSettings() }
         } else {
             showOnboarding()
         }
@@ -81,16 +93,52 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
 
     // MARK: - Hotkey / Accessibility
 
+    /// Apply the Settings app filter (all / blacklist / whitelist) against
+    /// whatever app is frontmost at gesture time. Nab itself is always allowed
+    /// so the menubar/Settings never lock the user out of their own gestures.
+    private func gestureAllowedInFrontmostApp() -> Bool {
+        let front = NSWorkspace.shared.frontmostApplication?.bundleIdentifier
+        if front == Bundle.main.bundleIdentifier { return true }
+        return settings.gestureAllowed(inApp: front)
+    }
+
     private func applyHotkeys() {
         let wantTap = settings.shortcutEnabled || settings.textShareEnabled || settings.cmdCtrlCopyImage
-        guard wantTap else { hotkey.stop(); axPollTimer?.invalidate(); return }
-        if hotkey.start() { return }
-        let opts = [kAXTrustedCheckOptionPrompt.takeUnretainedValue() as String: true] as CFDictionary
-        _ = AXIsProcessTrustedWithOptions(opts)
+        guard wantTap else { hotkey.stop(); axPollTimer?.invalidate(); axPollTimer = nil; return }
+
+        // Input Monitoring — not tap creation, not Accessibility — is the real
+        // gate for a `.listenOnly` keyboard CGEventTap ("listen" needs Input
+        // Monitoring; "modify" needs Accessibility). The tap is created
+        // successfully even without it, but then only sees Nab's own events, so
+        // gestures fire only while Nab is frontmost. Start the tap only once
+        // granted; otherwise prompt and poll until the user grants it.
+        // (Accessibility is still requested separately for the AX-based
+        // selection reader used by text share.)
+        if CGPreflightListenEventAccess() {
+            axPollTimer?.invalidate(); axPollTimer = nil
+            hotkey.start()
+            return
+        }
+        // Onboarding drives its own permission flow (and suppresses gestures), so
+        // don't nag alongside it — dismissOnboarding() re-invokes applyHotkeys().
+        guard !isOnboarding else { return }
+        // macOS does NOT show a dialog for Input Monitoring ("service does not
+        // allow prompting") — this call only registers Nab in the System
+        // Settings list with its toggle off. Tell the user where to flip it,
+        // once per launch, and poll until they do.
+        _ = CGRequestListenEventAccess()
+        if !toldUserAboutInputMonitoring {
+            toldUserAboutInputMonitoring = true
+            showToast(.error, "Gestures need Input Monitoring — enable Nab in System Settings → Privacy & Security")
+        }
         axPollTimer?.invalidate()
         axPollTimer = Timer.scheduledTimer(withTimeInterval: 2, repeats: true) { [weak self] timer in
             guard let self else { timer.invalidate(); return }
-            if self.hotkey.start() { timer.invalidate() }
+            guard CGPreflightListenEventAccess() else { return }
+            self.hotkey.stop()   // recreate the tap now that it's trusted
+            self.hotkey.start()
+            timer.invalidate()
+            self.axPollTimer = nil
         }
     }
 
@@ -112,57 +160,121 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         settingsWindow?.makeKeyAndOrderFront(nil)
     }
 
+    /// Onboarding is two acts: a transient, click-through "Welcome to Nab"
+    /// splash (a gradual fade — it can't block clicks, keys, or the permission
+    /// dialogs it leads to), then a regular titled window with the real steps.
     private func showOnboarding() {
         if let existing = onboardingWindow {
             NSApp.activate(ignoringOtherApps: true)
             existing.makeKeyAndOrderFront(nil)
             return
         }
+        guard splashWindow == nil else { return } // splash already playing
+        isOnboarding = true
+
         let screen = NSScreen.main ?? NSScreen.screens.first
         let frame = screen?.frame ?? NSRect(x: 0, y: 0, width: 1440, height: 900)
-
-        let host = NSHostingController(
-            rootView: OnboardingView(onFinish: { [weak self] in
-                self?.dismissOnboarding()
-            }).environmentObject(settings))
+        let host = NSHostingController(rootView: WelcomeSplash { [weak self] in
+            self?.showOnboardingWindow()
+        })
         host.view.frame = frame
         host.view.wantsLayer = true
         host.view.layer?.backgroundColor = .clear // no white flash before SwiftUI paints
 
-        // Borderless full-screen overlay (not the settings GUI). The SwiftUI
-        // content paints its own aurora + frosted card; the window is just a
-        // transparent, key-capable canvas floating above everything — including
-        // the menu bar — so the whole process reads as an overlay, not a window.
-        let window = OverlayWindow(contentRect: frame, styleMask: .borderless,
-                                   backing: .buffered, defer: false)
+        let window = NSWindow(contentRect: frame, styleMask: .borderless,
+                              backing: .buffered, defer: false)
         window.contentViewController = host
         window.isReleasedWhenClosed = false
         window.backgroundColor = .clear
         window.isOpaque = false
         window.hasShadow = false
-        window.level = .screenSaver
+        window.level = .floating
+        window.ignoresMouseEvents = true // pure decoration — never blocks the user
         window.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary, .transient]
-        window.delegate = self
         window.setFrame(frame, display: true)
+        splashWindow = window
+        window.orderFrontRegardless() // show without stealing focus
+    }
+
+    /// Second act: the permissions step in a normal, movable, closable window
+    /// — so macOS permission dialogs and the rest of the screen stay reachable
+    /// while it's up.
+    private func showOnboardingWindow() {
+        splashWindow?.orderOut(nil)
+        splashWindow?.close()
+        splashWindow = nil
+
+        let host = NSHostingController(
+            rootView: OnboardingView(
+                onContinue: { [weak self] in self?.showGestureGuide() },
+                onSkip: { [weak self] in self?.completeOnboarding() }
+            ).environmentObject(settings))
+        let window = NSWindow(contentViewController: host)
+        window.title = "Welcome to Nab"
+        window.styleMask = [.titled, .closable]
+        window.isReleasedWhenClosed = false
+        window.setContentSize(NSSize(width: 560, height: 560))
+        window.center()
+        window.delegate = self
         onboardingWindow = window
-        isOnboarding = true
         NSApp.activate(ignoringOtherApps: true)
         window.makeKeyAndOrderFront(nil)
     }
 
-    private func dismissOnboarding() {
+    /// Third act: the interactive gesture walkthrough in a frosted, card-sized
+    /// floating overlay (key-capable so the practice taps register; the rest
+    /// of the screen stays clickable).
+    private func showGestureGuide() {
+        let host = NSHostingController(
+            rootView: GestureGuideView { [weak self] in
+                self?.completeOnboarding()
+            }.environmentObject(settings))
+        let window = OverlayWindow(contentViewController: host)
+        window.styleMask = .borderless
+        window.isReleasedWhenClosed = false
+        window.backgroundColor = .clear
+        window.isOpaque = false
+        window.hasShadow = false // the card draws its own
+        window.level = .floating
+        window.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary, .transient]
+        window.center()
+        window.delegate = self
+        gestureGuideWindow = window // set BEFORE closing the permissions window,
+                                    // so windowWillClose sees the flow continuing
         onboardingWindow?.orderOut(nil)
         onboardingWindow?.close()
         onboardingWindow = nil
+        NSApp.activate(ignoringOtherApps: true)
+        window.makeKeyAndOrderFront(nil)
+    }
+
+    /// Onboarding is over (finished or skipped): tear down whatever act is up,
+    /// mark it done, and bring the global gestures online.
+    private func completeOnboarding() {
+        settings.hasOnboarded = true
+        for window in [onboardingWindow, gestureGuideWindow] {
+            window?.orderOut(nil)
+            window?.close()
+        }
+        onboardingWindow = nil
+        gestureGuideWindow = nil
         isOnboarding = false
+        applyHotkeys()  // start the tap (or begin prompting) now onboarding is done
     }
 
     /// Catches the onboarding window closing by any route (Finish or the
     /// titlebar close button) so global gestures aren't left suppressed.
     func windowWillClose(_ notification: Notification) {
-        if (notification.object as? NSWindow) === onboardingWindow {
-            onboardingWindow = nil
-            isOnboarding = false
+        let closing = notification.object as? NSWindow
+        if closing === onboardingWindow || closing === gestureGuideWindow {
+            if closing === onboardingWindow { onboardingWindow = nil }
+            if closing === gestureGuideWindow { gestureGuideWindow = nil }
+            // Only end onboarding when nothing else in the flow is still up
+            // (Continue closes the permissions window while the guide opens).
+            if onboardingWindow == nil && gestureGuideWindow == nil && isOnboarding {
+                isOnboarding = false
+                applyHotkeys()  // resume global gestures once the flow ends
+            }
         }
     }
 
@@ -202,9 +314,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         showToast(.success, "Image copied to clipboard")
     }
 
-    /// Capture a region and upload. Holding ⇧ during the gesture copies the raw
-    /// image link (embeds inline in Discord); without ⇧ you get the preview-card
-    /// page link. (Self-host has a single link, so ⇧ is a no-op there.)
+    /// Capture a region and upload. Holding ⇧ — during the gesture *or* at any
+    /// point while selecting the region — copies the raw image link (embeds
+    /// inline in Discord); without ⇧ you get the preview-card page link.
+    /// (Self-host has a single link, so ⇧ is a no-op there.)
     private func capture(shift: Bool) {
         // Hosting needs only a license key; self-host needs full provider config.
         if !settings.useNabHosting, settings.makeProvider() == nil { openSettings(); return }
@@ -221,7 +334,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         }
         guard let data = try? Data(contentsOf: tmp), !data.isEmpty else { return } // cancelled
 
-        upload(data: data, ext: fmt, origin: .capture, kindLabel: "Screenshot", rawImage: shift) { [weak self] in
+        // Re-sample ⇧ now that the interactive capture is done. The gesture-time
+        // flag alone misses the natural habit of holding ⇧ while dragging the
+        // region, so honor either. Query the HID state directly — the main run
+        // loop was blocked in waitUntilExit(), so NSEvent's cache may be stale.
+        let shiftNow = CGEventSource.flagsState(.combinedSessionState).contains(.maskShift)
+        let raw = shift || shiftNow
+
+        upload(data: data, ext: fmt, origin: .capture, kindLabel: "Screenshot", rawImage: raw) { [weak self] in
             if self?.settings.autoDeleteAfterUpload == true { try? FileManager.default.removeItem(at: tmp) }
         }
     }
@@ -230,8 +350,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
 
     @objc private func shareText() { shareText(raw: false) }
 
-    /// Share the current selection. `raw` skips the styled window image and
-    /// uploads the plain text instead (⇧ + double-⌃).
+    /// Share the current selection. Hosted shares upload the raw text and let
+    /// the viewer page render it in a single styled window (selectable, with
+    /// syntax highlighting) — no baked-in chrome, so the page doesn't show a
+    /// window inside a window. `raw` (⇧ + double-⌃) copies the direct .txt
+    /// link instead of the viewer page. Self-host has no viewer page, so it
+    /// keeps the styled window image (or plain text when raw).
     private func shareText(raw: Bool) {
         if !settings.useNabHosting, settings.makeProvider() == nil { openSettings(); return }
         DispatchQueue.global(qos: .userInitiated).async { [weak self] in
@@ -243,9 +367,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
                     self.showToast(.error, "No text selected")
                     return
                 }
-                // Render the selection as a styled window image (code/terminal vs prose),
-                // unless the user asked for a raw share by holding ⇧.
-                if !raw, let png = SnippetImage.renderPNG(text: text) {
+                if self.settings.useNabHosting {
+                    self.upload(data: Data(text.utf8), ext: "txt", origin: .text,
+                                kindLabel: "Text", rawImage: raw)
+                } else if !raw, let png = SnippetImage.renderPNG(text: text) {
                     self.upload(data: png, ext: "png", origin: .text, kindLabel: "Text")
                 } else {
                     self.upload(data: Data(text.utf8), ext: "txt", origin: .text, kindLabel: "Text")

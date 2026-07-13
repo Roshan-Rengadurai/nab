@@ -13,7 +13,7 @@
 # Developer account.
 set -euo pipefail
 
-VERSION="${1:-0.1.0}"
+VERSION="${1:-0.2.0}"
 APP_NAME="Nab"
 BUNDLE_ID="com.nabapp.Nab"
 VOL_NAME="Nab"
@@ -76,20 +76,32 @@ cat > "$APP/Contents/Info.plist" <<PLIST
     <key>CFBundleIconFile</key><string>AppIcon</string>
     <key>LSMinimumSystemVersion</key><string>13.0</string>
     <key>LSUIElement</key><true/>
+    <key>NSInputMonitoringUsageDescription</key>
+    <string>Nab watches for the double-tap ⌘ / ⌃ gestures that trigger capture and share.</string>
     <key>NSHighResolutionCapable</key><true/>
     <key>NSPrincipalClass</key><string>NSApplication</string>
 </dict>
 </plist>
 PLIST
 
-echo "==> Ad-hoc signing (stops the 'damaged / cannot be opened' error)"
-# Ad-hoc signing gives a valid, self-consistent signature so macOS won't call the
-# app "damaged". It is still unsigned by a registered developer, so first launch
+# Prefer the stable local identity (scripts/dev-signing-cert.sh) so keychain
+# ACLs and TCC grants (Accessibility / Screen Recording) survive rebuilds.
+# Fall back to ad-hoc, which is valid but resets those approvals every build.
+SIGN_ID="-"
+if security find-identity -v -p codesigning 2>/dev/null | grep -q "Nab Dev Signing"; then
+  SIGN_ID="Nab Dev Signing"
+  echo "==> Signing with stable identity '$SIGN_ID'"
+else
+  echo "==> Ad-hoc signing (run scripts/dev-signing-cert.sh once to stop the"
+  echo "    per-build keychain / permission prompts)"
+fi
+# Signing gives a valid, self-consistent signature so macOS won't call the app
+# "damaged". It is still unsigned by a registered developer, so first launch
 # shows the normal "unidentified developer" prompt (right-click > Open). Do NOT
 # add a Finder custom icon here: that leaves a com.apple.FinderInfo xattr that
 # codesign rejects, which can turn into a "damaged" error. The app's own
 # AppIcon.icns renders once the volume is mounted and Launch Services indexes it.
-codesign --force --deep --sign - "$APP"
+codesign --force --deep --sign "$SIGN_ID" "$APP"
 codesign --verify --deep --strict "$APP" && echo "    signature ok"
 
 echo "==> Staging DMG contents"

@@ -25,6 +25,8 @@
   --color-aqua: #8ec07c;
   --color-green: #b8bb26;
   --color-red: #fb4934;
+  --color-blue: #83a598;
+  --color-purple: #d3869b;
 
   --font-sans: var(--font-sans), ui-sans-serif, system-ui, sans-serif;
   --font-mono: var(--font-mono), ui-monospace, "SF Mono", Menlo, monospace;

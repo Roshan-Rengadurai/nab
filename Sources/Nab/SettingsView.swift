@@ -1,5 +1,7 @@
 import SwiftUI
 import AppKit
+import CoreGraphics
+import ApplicationServices
 
 enum Pane: String, CaseIterable, Identifiable {
     case general, storage, capture, sharing, notifications, history, about
@@ -135,6 +137,11 @@ struct SettingsView: View {
 
 struct GeneralPane: View {
     @EnvironmentObject var settings: AppSettings
+    @State private var screenOK = false
+    @State private var axOK = false
+    @State private var listenOK = false
+    private let poll = Timer.publish(every: 1, on: .main, in: .common).autoconnect()
+
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             ToggleRow(title: "Launch at login",
@@ -147,21 +154,164 @@ struct GeneralPane: View {
                       subtitle: "Play a chime when a link is copied",
                       isOn: $settings.soundOnSuccess)
 
+            GroupLabel(text: "Permissions").padding(.top, 4)
+            PermissionRow(icon: "keyboard", tint: Gruv.orange, title: "Input Monitoring",
+                          subtitle: "Global gestures — toggle Nab on in the system list.",
+                          granted: listenOK, action: requestListen)
+            PermissionRow(icon: "hand.tap.fill", tint: Gruv.yellow, title: "Accessibility",
+                          subtitle: "Required to read your selected text for sharing.",
+                          granted: axOK, action: requestAX)
+            PermissionRow(icon: "camera.viewfinder", tint: Gruv.aqua, title: "Screen Recording",
+                          subtitle: "Required to capture a screen region.",
+                          granted: screenOK, action: requestScreen)
+
             GroupLabel(text: "Shortcuts").padding(.top, 4)
             ToggleRow(title: "Tap ⌘ twice to capture",
-                      subtitle: "Global gesture — needs Accessibility permission",
+                      subtitle: "Global gesture — needs Input Monitoring permission",
                       isOn: $settings.shortcutEnabled)
             ToggleRow(title: "Tap ⌃ twice to share text",
                       subtitle: "Upload the current text selection as a link",
                       isOn: $settings.textShareEnabled)
             ToggleRow(title: "Hold ⇧ for a raw share",
-                      subtitle: "⇧ + ⌃⌃ skips the styled window and shares plain text",
+                      subtitle: "⇧ + ⌃⌃ copies the direct file link instead of the preview page",
                       isOn: $settings.shiftRawShare)
             ToggleRow(title: "Tap ⌘⌃ twice to copy image",
                       subtitle: "Copies the captured image directly — no upload, no link",
                       isOn: $settings.cmdCtrlCopyImage)
             SliderRow(title: "Max gap between taps", value: $settings.doubleCmdGap,
                       range: 150...600, step: 25, valueLabel: "\(Int(settings.doubleCmdGap)) ms")
+
+            GroupLabel(text: "Active in").padding(.top, 4)
+            AppFilterSection()
+        }
+        .onAppear(perform: refreshPermissions)
+        .onReceive(poll) { _ in refreshPermissions() }
+        // Re-check immediately whenever the Settings window regains key status
+        // (e.g. coming back from System Settings after flipping a toggle).
+        .onReceive(NotificationCenter.default.publisher(for: NSWindow.didBecomeKeyNotification)) { _ in
+            refreshPermissions()
+        }
+    }
+
+    private func refreshPermissions() {
+        let s = CGPreflightScreenCaptureAccess()
+        let a = AXIsProcessTrusted()
+        let l = CGPreflightListenEventAccess()
+        if s != screenOK { screenOK = s }
+        if a != axOK { axOK = a }
+        if l != listenOK { listenOK = l }
+    }
+
+    private func requestListen() {
+        // macOS never shows a dialog for Input Monitoring — the request only
+        // registers Nab in the list, so always take the user to the pane.
+        _ = CGRequestListenEventAccess()
+        NSWorkspace.shared.open(URL(string:
+            "x-apple.systempreferences:com.apple.preference.security?Privacy_ListenEvent")!)
+    }
+
+    private func requestAX() {
+        let opts = [kAXTrustedCheckOptionPrompt.takeUnretainedValue() as String: true] as CFDictionary
+        if !AXIsProcessTrustedWithOptions(opts) {
+            NSWorkspace.shared.open(URL(string:
+                "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility")!)
+        }
+    }
+
+    private func requestScreen() {
+        if !CGRequestScreenCaptureAccess() {
+            NSWorkspace.shared.open(URL(string:
+                "x-apple.systempreferences:com.apple.preference.security?Privacy_ScreenCapture")!)
+        }
+    }
+}
+
+/// Where the double-tap gestures fire: everywhere, everywhere-except, or
+/// only-in a list of apps. Apps are stored by bundle ID; rows resolve the
+/// icon + display name from the installed app when available.
+struct AppFilterSection: View {
+    @EnvironmentObject var settings: AppSettings
+
+    private let modes = [
+        CardOption(id: "all", symbol: "globe", label: "All apps"),
+        CardOption(id: "blacklist", symbol: "hand.raised.fill", label: "Exclude list"),
+        CardOption(id: "whitelist", symbol: "checklist", label: "Only list"),
+    ]
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            SegmentedCards(options: modes, selection: $settings.appFilterMode)
+
+            if settings.appFilterMode != "all" {
+                Card {
+                    VStack(alignment: .leading, spacing: 0) {
+                        if settings.appFilterList.isEmpty {
+                            Text(settings.appFilterMode == "blacklist"
+                                 ? "No apps excluded — gestures fire everywhere."
+                                 : "No apps listed — gestures fire nowhere. Add one.")
+                                .font(.system(size: 11)).foregroundColor(Gruv.gray)
+                                .padding(.vertical, 6)
+                        }
+                        ForEach(settings.appFilterList, id: \.self) { id in
+                            appRow(id)
+                            if id != settings.appFilterList.last {
+                                Rectangle().fill(Gruv.bg2).frame(height: 1)
+                            }
+                        }
+                        Button(action: addApp) {
+                            Label("Add App…", systemImage: "plus")
+                                .font(.system(size: 12, weight: .medium)).foregroundColor(Gruv.orange)
+                                .padding(.horizontal, 10).padding(.vertical, 6)
+                                .background(RoundedRectangle(cornerRadius: 7).fill(Gruv.orange.opacity(0.12)))
+                        }
+                        .buttonStyle(.plain)
+                        .padding(.top, settings.appFilterList.isEmpty ? 4 : 10)
+                    }
+                }
+            }
+        }
+        .animation(.spring(response: 0.35, dampingFraction: 0.8), value: settings.appFilterMode)
+    }
+
+    private func appRow(_ bundleID: String) -> some View {
+        let url = NSWorkspace.shared.urlForApplication(withBundleIdentifier: bundleID)
+        let name = url.map { FileManager.default.displayName(atPath: $0.path) } ?? bundleID
+        let icon: NSImage? = url.map { NSWorkspace.shared.icon(forFile: $0.path) }
+        return HStack(spacing: 10) {
+            if let icon {
+                Image(nsImage: icon).resizable().frame(width: 22, height: 22)
+            } else {
+                Image(systemName: "app.dashed")
+                    .font(.system(size: 15)).foregroundColor(Gruv.gray)
+                    .frame(width: 22, height: 22)
+            }
+            VStack(alignment: .leading, spacing: 1) {
+                Text(name).font(.system(size: 12, weight: .medium)).foregroundColor(Gruv.fg1)
+                Text(bundleID).font(.mono(10)).foregroundColor(Gruv.gray)
+            }
+            Spacer()
+            Button {
+                settings.appFilterList.removeAll { $0 == bundleID }
+            } label: {
+                Image(systemName: "xmark.circle.fill")
+                    .font(.system(size: 13)).foregroundColor(Gruv.gray)
+            }
+            .buttonStyle(.plain)
+        }
+        .padding(.vertical, 7)
+    }
+
+    private func addApp() {
+        let panel = NSOpenPanel()
+        panel.title = "Choose Applications"
+        panel.directoryURL = URL(fileURLWithPath: "/Applications")
+        panel.allowedContentTypes = [.application]
+        panel.allowsMultipleSelection = true
+        panel.canChooseDirectories = false
+        guard panel.runModal() == .OK else { return }
+        for url in panel.urls {
+            guard let id = Bundle(url: url)?.bundleIdentifier else { continue }
+            if !settings.appFilterList.contains(id) { settings.appFilterList.append(id) }
         }
     }
 }
@@ -335,12 +485,20 @@ struct SharingPane: View {
 }
 
 struct AboutPane: View {
+    /// Version from the app bundle (stamped by scripts/package-dmg.sh), so the
+    /// About pane can never drift from the shipped build. Dev runs without a
+    /// bundle fall back to a recognizable marker.
+    private var version: String {
+        let v = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String
+        return "v\(v ?? "dev")"
+    }
+
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             Card {
                 VStack(alignment: .leading, spacing: 8) {
                     Text("Nab").font(.mono(20, weight: .bold)).foregroundColor(Gruv.fg0)
-                    Text("v0.1.0").font(.mono(12)).foregroundColor(Gruv.orange)
+                    Text(version).font(.mono(12)).foregroundColor(Gruv.orange)
                     Text("Nab it. It's already on your clipboard. A menubar capture tool — hosted, or self-hosted to your own bucket.")
                         .font(.system(size: 12)).foregroundColor(Gruv.fg3)
                         .fixedSize(horizontal: false, vertical: true)

@@ -33,42 +33,65 @@ func render(_ w: Int, _ h: Int, to path: String, _ draw: () -> Void) {
     try? png.write(to: URL(fileURLWithPath: path))
 }
 
-// Draw the scissors, authored in the 32x32 SVG viewBox, at the given scale (points == pixels here).
-func drawScissors(scale s: CGFloat) {
-    func P(_ x: CGFloat, _ y: CGFloat) -> NSPoint { NSPoint(x: x * s, y: y * s) }
-    dark.setStroke()
-    for (a, b) in [((8.0, 5.0), (24.0, 27.0)), ((24.0, 5.0), (8.0, 27.0))] {
-        let path = NSBezierPath()
-        path.lineWidth = 2.8 * s
-        path.lineCapStyle = .round
-        path.move(to: P(a.0, a.1))
-        path.line(to: P(b.0, b.1))
-        path.stroke()
+// Slightly lighter/warmer orange for the top of the background gradient.
+let orangeLight = NSColor(srgbRed: 0xff / 255.0, green: 0x9f / 255.0, blue: 0x40 / 255.0, alpha: 1)
+
+// A superellipse ("squircle") path — the smooth continuous corner Apple uses for
+// app icons, rather than a plain circular-corner rounded rect.
+func squircle(in rect: NSRect, n: CGFloat = 5) -> NSBezierPath {
+    let path = NSBezierPath()
+    let a = rect.width / 2, b = rect.height / 2
+    let cx = rect.midX, cy = rect.midY
+    let steps = 720
+    for i in 0...steps {
+        let t = CGFloat(i) / CGFloat(steps) * 2 * .pi
+        let ct = cos(t), st = sin(t)
+        let x = cx + a * copysign(pow(abs(ct), 2 / n), ct)
+        let y = cy + b * copysign(pow(abs(st), 2 / n), st)
+        if i == 0 { path.move(to: NSPoint(x: x, y: y)) } else { path.line(to: NSPoint(x: x, y: y)) }
     }
-    for c in [(24.0, 27.0), (8.0, 27.0)] {
-        let r = 3.8 * s
-        let ring = NSBezierPath(ovalIn: NSRect(x: c.0 * s - r, y: c.1 * s - r, width: r * 2, height: r * 2))
-        ring.lineWidth = 2.2 * s
-        ring.stroke()
-    }
-    let pr = 2.5 * s
-    orange.setFill()
-    NSBezierPath(ovalIn: NSRect(x: 16 * s - pr, y: 16 * s - pr, width: pr * 2, height: pr * 2)).fill()
+    path.close()
+    return path
 }
 
+// Tint a monochrome/template symbol image to a solid color.
+func tinted(_ image: NSImage, _ color: NSColor) -> NSImage {
+    let out = NSImage(size: image.size)
+    out.lockFocus()
+    color.set()
+    let r = NSRect(origin: .zero, size: image.size)
+    image.draw(in: r)
+    r.fill(using: .sourceAtop)
+    out.unlockFocus()
+    out.isTemplate = false
+    return out
+}
+
+// App icon: an orange squircle carrying the same SF Symbol scissors shown in the
+// menu bar — cream, centered, with a soft drop shadow for a modern lift.
 func makeIcon(_ path: String) {
     let side = 1024
     render(side, side, to: path) {
-        let radius = CGFloat(side) * 7.0 / 32.0
-        orange.setFill()
-        NSBezierPath(roundedRect: NSRect(x: 0, y: 0, width: side, height: side),
-                    xRadius: radius, yRadius: radius).fill()
-        // flip so SVG (y-down) coords draw upright
-        let t = NSAffineTransform()
-        t.translateX(by: 0, yBy: CGFloat(side))
-        t.scaleX(by: 1, yBy: -1)
-        t.concat()
-        drawScissors(scale: CGFloat(side) / 32.0)
+        let rect = NSRect(x: 0, y: 0, width: side, height: side)
+        let bg = squircle(in: rect)
+        NSGradient(colors: [orange, orangeLight])!.draw(in: bg, angle: 90) // base at bottom → lighter at top
+
+        guard let base = NSImage(systemSymbolName: "scissors", accessibilityDescription: "Nab")?
+            .withSymbolConfiguration(NSImage.SymbolConfiguration(pointSize: 560, weight: .regular)) else {
+            FileHandle.standardError.write("scissors symbol unavailable\n".data(using: .utf8)!); exit(1)
+        }
+        let mark = tinted(base, fg)
+        let maxDim = CGFloat(side) * 0.56
+        let scale = maxDim / max(mark.size.width, mark.size.height)
+        let w = mark.size.width * scale, h = mark.size.height * scale
+        let markRect = NSRect(x: (CGFloat(side) - w) / 2, y: (CGFloat(side) - h) / 2, width: w, height: h)
+
+        let shadow = NSShadow()
+        shadow.shadowColor = NSColor.black.withAlphaComponent(0.28)
+        shadow.shadowOffset = NSSize(width: 0, height: -CGFloat(side) * 0.012) // fall downward
+        shadow.shadowBlurRadius = CGFloat(side) * 0.02
+        shadow.set()
+        mark.draw(in: markRect)
     }
 }
 

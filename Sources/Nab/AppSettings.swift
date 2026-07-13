@@ -79,6 +79,14 @@ final class AppSettings: ObservableObject {
     @Published var toastDuration: Double { didSet { d.set(toastDuration, forKey: "toastDuration") } } // s
     @Published var toastFollowCursor: Bool { didSet { d.set(toastFollowCursor, forKey: "toastFollowCursor") } }
 
+    // App filter — where the double-tap gestures are allowed to fire.
+    //   all       : any frontmost app (default)
+    //   blacklist : everywhere except the listed apps
+    //   whitelist : only in the listed apps
+    @Published var appFilterMode: String { didSet { d.set(appFilterMode, forKey: "appFilterMode") } }
+    /// Bundle identifiers the mode applies to.
+    @Published var appFilterList: [String] { didSet { d.set(appFilterList, forKey: "appFilterList") } }
+
     // Text highlight share (double-tap Control)
     @Published var textShareEnabled: Bool { didSet { d.set(textShareEnabled, forKey: "textShareEnabled") } }
 
@@ -111,6 +119,8 @@ final class AppSettings: ObservableObject {
         toastPosition = d.string(forKey: "toastPosition") ?? "topTrailing"
         toastDuration = d.object(forKey: "toastDuration") as? Double ?? 2.2
         toastFollowCursor = d.bool(forKey: "toastFollowCursor")
+        appFilterMode = d.string(forKey: "appFilterMode") ?? "all"
+        appFilterList = d.stringArray(forKey: "appFilterList") ?? []
         textShareEnabled = d.object(forKey: "textShareEnabled") as? Bool ?? true
         shiftRawShare = d.object(forKey: "shiftRawShare") as? Bool ?? true
         hasOnboarded = d.bool(forKey: "hasOnboarded")
@@ -121,10 +131,33 @@ final class AppSettings: ObservableObject {
         nabLicenseKey = KeychainStore.shared.get(account: nabKeyAccount) ?? ""
     }
 
+    /// Whether the double-tap gestures may fire while `bundleID` is frontmost.
+    /// A nil bundle ID (no identifiable frontmost app) is allowed unless the
+    /// mode is whitelist — an unknown app can't be on the list.
+    func gestureAllowed(inApp bundleID: String?) -> Bool {
+        switch appFilterMode {
+        case "whitelist":
+            guard let id = bundleID else { return false }
+            return appFilterList.contains(id)
+        case "blacklist":
+            guard let id = bundleID else { return true }
+            return !appFilterList.contains(id)
+        default:
+            return true
+        }
+    }
+
     /// True when enough is configured to attempt an upload.
     var isConfigured: Bool {
         URL(string: endpoint) != nil && !endpoint.isEmpty
             && !bucket.isEmpty && !accessKey.isEmpty && !secretKey.isEmpty
+    }
+
+    /// Whether the active upload mode is ready to go — hosted mode just needs
+    /// a license key; self-host needs the full provider config. Used by the
+    /// launch check so Settings doesn't pop open on every start for hosted users.
+    var isReadyToUpload: Bool {
+        useNabHosting ? !nabLicenseKey.isEmpty : isConfigured
     }
 
     /// Build a provider from the current settings, or nil if incomplete.
