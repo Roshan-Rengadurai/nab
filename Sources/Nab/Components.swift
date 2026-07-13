@@ -1,4 +1,39 @@
 import SwiftUI
+import AppKit
+import CoreGraphics
+import ApplicationServices
+
+// MARK: - System permissions
+
+/// The three macOS permissions Nab needs, with live status + a request that
+/// falls back to opening the right Privacy pane. Shared by onboarding and
+/// Settings so the logic and deep-links live in exactly one place.
+enum SystemPermissions {
+    static var inputMonitoring: Bool { CGPreflightListenEventAccess() }
+    static var accessibility: Bool { AXIsProcessTrusted() }
+    static var screenRecording: Bool { CGPreflightScreenCaptureAccess() }
+
+    private static func openPane(_ anchor: String) {
+        NSWorkspace.shared.open(URL(string:
+            "x-apple.systempreferences:com.apple.preference.security?\(anchor)")!)
+    }
+
+    /// macOS never shows a dialog for Input Monitoring — the request only
+    /// registers Nab in the list, so always take the user to the pane.
+    static func requestInputMonitoring() {
+        _ = CGRequestListenEventAccess()
+        openPane("Privacy_ListenEvent")
+    }
+
+    static func requestAccessibility() {
+        let opts = [kAXTrustedCheckOptionPrompt.takeUnretainedValue() as String: true] as CFDictionary
+        if !AXIsProcessTrustedWithOptions(opts) { openPane("Privacy_Accessibility") }
+    }
+
+    static func requestScreenRecording() {
+        if !CGRequestScreenCaptureAccess() { openPane("Privacy_ScreenCapture") }
+    }
+}
 
 // MARK: - Detail pane header (icon chip + title)
 

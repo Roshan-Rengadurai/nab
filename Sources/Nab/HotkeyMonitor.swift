@@ -1,7 +1,7 @@
 import AppKit
 
 /// Global "tap a modifier twice" gestures via a passive CGEventTap:
-/// double-⌘ (capture) and double-⌃ (text share). Requires Accessibility
+/// double-⌘ (capture) and double-⌃ (text share). Requires Input Monitoring
 /// permission. Listen-only — never swallows the user's events.
 ///
 /// Shift is allowed to ride along on the gesture: the fire callbacks receive

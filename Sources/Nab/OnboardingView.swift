@@ -1,7 +1,5 @@
 import SwiftUI
 import AppKit
-import CoreGraphics
-import ApplicationServices
 
 // MARK: - Overlay window (borderless, key-capable)
 
@@ -296,16 +294,21 @@ struct OnboardingView: View {
     private var permissions: some View {
         let allOK = screenOK && axOK && listenOK
         return VStack(alignment: .leading, spacing: 14) {
-            stepTitle("Permissions", "Three macOS permissions. Grant them here — the status updates live.")
-            permissionCard(
-                icon: "keyboard", tint: Gruv.orange, title: "Input Monitoring",
-                desc: "For the gestures — toggle Nab on in the list.", granted: listenOK) { requestListen() }
-            permissionCard(
-                icon: "camera.viewfinder", tint: Gruv.aqua, title: "Screen Recording",
-                desc: "To capture a screen region.", granted: screenOK) { requestScreen() }
-            permissionCard(
-                icon: "hand.tap.fill", tint: Gruv.yellow, title: "Accessibility",
-                desc: "To read your selected text for sharing.", granted: axOK) { requestAX() }
+            VStack(alignment: .leading, spacing: 6) {
+                Text("Permissions").font(.mono(20, weight: .bold)).foregroundColor(Gruv.fg0)
+                Text("Three macOS permissions. Grant them here — the status updates live.")
+                    .font(.system(size: 13)).foregroundColor(Gruv.fg3)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            PermissionRow(icon: "keyboard", tint: Gruv.orange, title: "Input Monitoring",
+                          subtitle: "For the gestures — toggle Nab on in the list.",
+                          granted: listenOK, action: SystemPermissions.requestInputMonitoring)
+            PermissionRow(icon: "camera.viewfinder", tint: Gruv.aqua, title: "Screen Recording",
+                          subtitle: "To capture a screen region.",
+                          granted: screenOK, action: SystemPermissions.requestScreenRecording)
+            PermissionRow(icon: "hand.tap.fill", tint: Gruv.yellow, title: "Accessibility",
+                          subtitle: "To read your selected text for sharing.",
+                          granted: axOK, action: SystemPermissions.requestAccessibility)
             Text(allOK
                  ? "All granted — you're ready for the gestures."
                  : "You can grant later too; capture still works from the menubar.")
@@ -313,22 +316,6 @@ struct OnboardingView: View {
                 .animation(.easeInOut, value: allOK)
             Spacer()
         }
-    }
-
-    // MARK: Pieces
-
-    private func stepTitle(_ title: String, _ subtitle: String) -> some View {
-        VStack(alignment: .leading, spacing: 6) {
-            Text(title).font(.mono(20, weight: .bold)).foregroundColor(Gruv.fg0)
-            Text(subtitle).font(.system(size: 13)).foregroundColor(Gruv.fg3)
-                .fixedSize(horizontal: false, vertical: true)
-        }
-    }
-
-    private func permissionCard(icon: String, tint: Color, title: String, desc: String,
-                                granted: Bool, action: @escaping () -> Void) -> some View {
-        PermissionRow(icon: icon, tint: tint, title: title, subtitle: desc,
-                      granted: granted, action: action)
     }
 
     private var footer: some View {
@@ -350,9 +337,9 @@ struct OnboardingView: View {
     // MARK: Permissions
 
     private func refreshPermissions() {
-        let s = CGPreflightScreenCaptureAccess()
-        let a = AXIsProcessTrusted()
-        let l = CGPreflightListenEventAccess()
+        let s = SystemPermissions.screenRecording
+        let a = SystemPermissions.accessibility
+        let l = SystemPermissions.inputMonitoring
         guard s != screenOK || a != axOK || l != listenOK else { return }
         // A little audible feedback when a permission flips green — and a
         // brighter chime when the last one lands.
@@ -364,30 +351,6 @@ struct OnboardingView: View {
             NSSound(named: s && a && l ? "Glass" : "Tink")?.play()
         }
     }
-
-    private func requestListen() {
-        // macOS never shows a dialog for Input Monitoring — the request only
-        // registers Nab in the list, so always take the user to the pane.
-        _ = CGRequestListenEventAccess()
-        NSWorkspace.shared.open(URL(string:
-            "x-apple.systempreferences:com.apple.preference.security?Privacy_ListenEvent")!)
-    }
-
-    private func requestScreen() {
-        if !CGRequestScreenCaptureAccess() {
-            NSWorkspace.shared.open(URL(string:
-                "x-apple.systempreferences:com.apple.preference.security?Privacy_ScreenCapture")!)
-        }
-    }
-
-    private func requestAX() {
-        let opts = [kAXTrustedCheckOptionPrompt.takeUnretainedValue() as String: true] as CFDictionary
-        if !AXIsProcessTrustedWithOptions(opts) {
-            NSWorkspace.shared.open(URL(string:
-                "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility")!)
-        }
-    }
-
 }
 
 // MARK: - Vsync-animated aurora background

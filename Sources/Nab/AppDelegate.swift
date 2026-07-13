@@ -23,7 +23,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
     private let toast = ToastController()
     private let hotkey = HotkeyMonitor()
     private var cancellables = Set<AnyCancellable>()
-    private var axPollTimer: Timer?
+    /// Polls for Input Monitoring after a denied/pending grant, starting the tap once granted.
+    private var listenPollTimer: Timer?
     /// One guidance toast per launch about the (unpromptable) Input Monitoring permission.
     private var toldUserAboutInputMonitoring = false
 
@@ -91,7 +92,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         }
     }
 
-    // MARK: - Hotkey / Accessibility
+    // MARK: - Hotkey / Input Monitoring
 
     /// Apply the Settings app filter (all / blacklist / whitelist) against
     /// whatever app is frontmost at gesture time. Nab itself is always allowed
@@ -104,7 +105,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
 
     private func applyHotkeys() {
         let wantTap = settings.shortcutEnabled || settings.textShareEnabled || settings.cmdCtrlCopyImage
-        guard wantTap else { hotkey.stop(); axPollTimer?.invalidate(); axPollTimer = nil; return }
+        guard wantTap else { hotkey.stop(); listenPollTimer?.invalidate(); listenPollTimer = nil; return }
 
         // Input Monitoring — not tap creation, not Accessibility — is the real
         // gate for a `.listenOnly` keyboard CGEventTap ("listen" needs Input
@@ -115,12 +116,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         // (Accessibility is still requested separately for the AX-based
         // selection reader used by text share.)
         if CGPreflightListenEventAccess() {
-            axPollTimer?.invalidate(); axPollTimer = nil
+            listenPollTimer?.invalidate(); listenPollTimer = nil
             hotkey.start()
             return
         }
         // Onboarding drives its own permission flow (and suppresses gestures), so
-        // don't nag alongside it — dismissOnboarding() re-invokes applyHotkeys().
+        // don't nag alongside it — completeOnboarding() re-invokes applyHotkeys().
         guard !isOnboarding else { return }
         // macOS does NOT show a dialog for Input Monitoring ("service does not
         // allow prompting") — this call only registers Nab in the System
@@ -131,14 +132,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
             toldUserAboutInputMonitoring = true
             showToast(.error, "Gestures need Input Monitoring — enable Nab in System Settings → Privacy & Security")
         }
-        axPollTimer?.invalidate()
-        axPollTimer = Timer.scheduledTimer(withTimeInterval: 2, repeats: true) { [weak self] timer in
+        listenPollTimer?.invalidate()
+        listenPollTimer = Timer.scheduledTimer(withTimeInterval: 2, repeats: true) { [weak self] timer in
             guard let self else { timer.invalidate(); return }
             guard CGPreflightListenEventAccess() else { return }
             self.hotkey.stop()   // recreate the tap now that it's trusted
             self.hotkey.start()
             timer.invalidate()
-            self.axPollTimer = nil
+            self.listenPollTimer = nil
         }
     }
 

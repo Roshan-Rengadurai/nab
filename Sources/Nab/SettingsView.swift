@@ -1,7 +1,5 @@
 import SwiftUI
 import AppKit
-import CoreGraphics
-import ApplicationServices
 
 enum Pane: String, CaseIterable, Identifiable {
     case general, storage, capture, sharing, notifications, history, about
@@ -157,13 +155,13 @@ struct GeneralPane: View {
             GroupLabel(text: "Permissions").padding(.top, 4)
             PermissionRow(icon: "keyboard", tint: Gruv.orange, title: "Input Monitoring",
                           subtitle: "Global gestures — toggle Nab on in the system list.",
-                          granted: listenOK, action: requestListen)
+                          granted: listenOK, action: SystemPermissions.requestInputMonitoring)
             PermissionRow(icon: "hand.tap.fill", tint: Gruv.yellow, title: "Accessibility",
                           subtitle: "Required to read your selected text for sharing.",
-                          granted: axOK, action: requestAX)
+                          granted: axOK, action: SystemPermissions.requestAccessibility)
             PermissionRow(icon: "camera.viewfinder", tint: Gruv.aqua, title: "Screen Recording",
                           subtitle: "Required to capture a screen region.",
-                          granted: screenOK, action: requestScreen)
+                          granted: screenOK, action: SystemPermissions.requestScreenRecording)
 
             GroupLabel(text: "Shortcuts").padding(.top, 4)
             ToggleRow(title: "Tap ⌘ twice to capture",
@@ -194,35 +192,9 @@ struct GeneralPane: View {
     }
 
     private func refreshPermissions() {
-        let s = CGPreflightScreenCaptureAccess()
-        let a = AXIsProcessTrusted()
-        let l = CGPreflightListenEventAccess()
-        if s != screenOK { screenOK = s }
-        if a != axOK { axOK = a }
-        if l != listenOK { listenOK = l }
-    }
-
-    private func requestListen() {
-        // macOS never shows a dialog for Input Monitoring — the request only
-        // registers Nab in the list, so always take the user to the pane.
-        _ = CGRequestListenEventAccess()
-        NSWorkspace.shared.open(URL(string:
-            "x-apple.systempreferences:com.apple.preference.security?Privacy_ListenEvent")!)
-    }
-
-    private func requestAX() {
-        let opts = [kAXTrustedCheckOptionPrompt.takeUnretainedValue() as String: true] as CFDictionary
-        if !AXIsProcessTrustedWithOptions(opts) {
-            NSWorkspace.shared.open(URL(string:
-                "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility")!)
-        }
-    }
-
-    private func requestScreen() {
-        if !CGRequestScreenCaptureAccess() {
-            NSWorkspace.shared.open(URL(string:
-                "x-apple.systempreferences:com.apple.preference.security?Privacy_ScreenCapture")!)
-        }
+        screenOK = SystemPermissions.screenRecording
+        axOK = SystemPermissions.accessibility
+        listenOK = SystemPermissions.inputMonitoring
     }
 }
 
