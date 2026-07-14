@@ -154,7 +154,7 @@ struct GeneralPane: View {
 
             GroupLabel(text: "Permissions").padding(.top, 4)
             PermissionRow(icon: "keyboard", tint: Gruv.orange, title: "Input Monitoring",
-                          subtitle: "Global gestures — toggle Nab on in the system list.",
+                          subtitle: "Global gestures, toggle Nab on in the system list.",
                           granted: listenOK, action: SystemPermissions.requestInputMonitoring)
             PermissionRow(icon: "hand.tap.fill", tint: Gruv.yellow, title: "Accessibility",
                           subtitle: "Required to read your selected text for sharing.",
@@ -165,7 +165,7 @@ struct GeneralPane: View {
 
             GroupLabel(text: "Shortcuts").padding(.top, 4)
             ToggleRow(title: "Tap ⌘ twice to capture",
-                      subtitle: "Global gesture — needs Input Monitoring permission",
+                      subtitle: "Global gesture, needs Input Monitoring permission",
                       isOn: $settings.shortcutEnabled)
             ToggleRow(title: "Tap ⌃ twice to share text",
                       subtitle: "Upload the current text selection as a link",
@@ -174,7 +174,7 @@ struct GeneralPane: View {
                       subtitle: "⇧ + ⌃⌃ copies the direct file link instead of the preview page",
                       isOn: $settings.shiftRawShare)
             ToggleRow(title: "Tap ⌘⌃ twice to copy image",
-                      subtitle: "Copies the captured image directly — no upload, no link",
+                      subtitle: "Copies the captured image directly, no upload, no link",
                       isOn: $settings.cmdCtrlCopyImage)
             SliderRow(title: "Max gap between taps", value: $settings.doubleCmdGap,
                       range: 150...600, step: 25, valueLabel: "\(Int(settings.doubleCmdGap)) ms")
@@ -219,8 +219,8 @@ struct AppFilterSection: View {
                     VStack(alignment: .leading, spacing: 0) {
                         if settings.appFilterList.isEmpty {
                             Text(settings.appFilterMode == "blacklist"
-                                 ? "No apps excluded — gestures fire everywhere."
-                                 : "No apps listed — gestures fire nowhere. Add one.")
+                                 ? "No apps excluded, gestures fire everywhere."
+                                 : "No apps listed, gestures fire nowhere. Add one.")
                                 .font(.system(size: 11)).foregroundColor(Gruv.gray)
                                 .padding(.vertical, 6)
                         }
@@ -344,7 +344,7 @@ struct StoragePane: View {
         VStack(alignment: .leading, spacing: 12) {
             GroupLabel(text: "Hosting")
             ToggleRow(title: "Use Nab hosting",
-                      subtitle: "Upload to Nab — no bucket setup. Links preview in Discord & Slack.",
+                      subtitle: "Upload to Nab, no bucket setup. Links preview in Discord & Slack.",
                       isOn: $settings.useNabHosting)
 
             if settings.useNabHosting {
@@ -380,7 +380,7 @@ struct StoragePane: View {
                 Circle().fill(settings.nabLicenseKey.isEmpty ? Gruv.red : Gruv.green).frame(width: 9, height: 9)
                 Text(settings.nabLicenseKey.isEmpty
                      ? "Enter your license key to enable hosting"
-                     : "Ready — hosted uploads on")
+                     : "Ready: hosted uploads on")
                     .font(.system(size: 12)).foregroundColor(settings.nabLicenseKey.isEmpty ? Gruv.fg3 : Gruv.fg1)
                 Spacer()
             }
@@ -411,7 +411,7 @@ struct StoragePane: View {
         Card {
             HStack(spacing: 10) {
                 Circle().fill(settings.isConfigured ? Gruv.green : Gruv.red).frame(width: 9, height: 9)
-                Text(settings.isConfigured ? "Ready to upload" : "Incomplete — fill in endpoint, bucket, and credentials")
+                Text(settings.isConfigured ? "Ready to upload" : "Incomplete: fill in endpoint, bucket, and credentials")
                     .font(.system(size: 12)).foregroundColor(settings.isConfigured ? Gruv.fg1 : Gruv.fg3)
                 Spacer()
             }
@@ -471,14 +471,14 @@ struct AboutPane: View {
                 VStack(alignment: .leading, spacing: 8) {
                     Text("Nab").font(.mono(20, weight: .bold)).foregroundColor(Gruv.fg0)
                     Text(version).font(.mono(12)).foregroundColor(Gruv.orange)
-                    Text("Nab it. It's already on your clipboard. A menubar capture tool — hosted, or self-hosted to your own bucket.")
+                    Text("Nab it. It's already on your clipboard. A menubar capture tool, hosted or self-hosted to your own bucket.")
                         .font(.system(size: 12)).foregroundColor(Gruv.fg3)
                         .fixedSize(horizontal: false, vertical: true)
                 }
             }
             Card {
                 HStack {
-                    Text("We host nothing on the self-host path — bytes go bucket-direct.")
+                    Text("We host nothing on the self-host path, bytes go bucket-direct.")
                         .font(.system(size: 11)).foregroundColor(Gruv.gray)
                     Spacer()
                 }
@@ -503,7 +503,7 @@ struct HistoryPane: View {
                 Card {
                     HStack {
                         Image(systemName: "tray").foregroundColor(Gruv.gray)
-                        Text("No uploads yet — your shares will appear here.")
+                        Text("No uploads yet, your shares will appear here.")
                             .font(.system(size: 12)).foregroundColor(Gruv.fg3)
                         Spacer()
                     }

@@ -18,7 +18,7 @@ enum SystemPermissions {
             "x-apple.systempreferences:com.apple.preference.security?\(anchor)")!)
     }
 
-    /// macOS never shows a dialog for Input Monitoring — the request only
+    /// macOS never shows a dialog for Input Monitoring, the request only
     /// registers Nab in the list, so always take the user to the pane.
     static func requestInputMonitoring() {
         _ = CGRequestListenEventAccess()

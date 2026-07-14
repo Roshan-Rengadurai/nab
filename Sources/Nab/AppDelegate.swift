@@ -61,7 +61,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         hotkey.onControlDouble = { [weak self] shiftHeld in
             guard let self, !self.isOnboarding, self.settings.textShareEnabled,
                   self.gestureAllowedInFrontmostApp() else { return }
-            // ⇧ rides along to skip the styled window — when the setting allows it.
+            // ⇧ rides along to skip the styled window, when the setting allows it.
             let raw = shiftHeld && self.settings.shiftRawShare
             self.shareText(raw: raw)
         }
@@ -85,7 +85,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
 
         if settings.hasOnboarded {
             // Only surface Settings when the active mode genuinely can't upload
-            // yet — hosted users with a license key shouldn't see it at launch.
+            // yet, hosted users with a license key shouldn't see it at launch.
             if !settings.isReadyToUpload { openSettings() }
         } else {
             showOnboarding()
@@ -107,7 +107,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         let wantTap = settings.shortcutEnabled || settings.textShareEnabled || settings.cmdCtrlCopyImage
         guard wantTap else { hotkey.stop(); listenPollTimer?.invalidate(); listenPollTimer = nil; return }
 
-        // Input Monitoring — not tap creation, not Accessibility — is the real
+        // Input Monitoring, not tap creation, not Accessibility, is the real
         // gate for a `.listenOnly` keyboard CGEventTap ("listen" needs Input
         // Monitoring; "modify" needs Accessibility). The tap is created
         // successfully even without it, but then only sees Nab's own events, so
@@ -121,16 +121,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
             return
         }
         // Onboarding drives its own permission flow (and suppresses gestures), so
-        // don't nag alongside it — completeOnboarding() re-invokes applyHotkeys().
+        // don't nag alongside it, completeOnboarding() re-invokes applyHotkeys().
         guard !isOnboarding else { return }
         // macOS does NOT show a dialog for Input Monitoring ("service does not
-        // allow prompting") — this call only registers Nab in the System
+        // allow prompting"), this call only registers Nab in the System
         // Settings list with its toggle off. Tell the user where to flip it,
         // once per launch, and poll until they do.
         _ = CGRequestListenEventAccess()
         if !toldUserAboutInputMonitoring {
             toldUserAboutInputMonitoring = true
-            showToast(.error, "Gestures need Input Monitoring — enable Nab in System Settings → Privacy & Security")
+            showToast(.error, "Gestures need Input Monitoring, enable Nab in System Settings → Privacy & Security")
         }
         listenPollTimer?.invalidate()
         listenPollTimer = Timer.scheduledTimer(withTimeInterval: 2, repeats: true) { [weak self] timer in
@@ -162,7 +162,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
     }
 
     /// Onboarding is two acts: a transient, click-through "Welcome to Nab"
-    /// splash (a gradual fade — it can't block clicks, keys, or the permission
+    /// splash (a gradual fade, it can't block clicks, keys, or the permission
     /// dialogs it leads to), then a regular titled window with the real steps.
     private func showOnboarding() {
         if let existing = onboardingWindow {
@@ -190,7 +190,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         window.isOpaque = false
         window.hasShadow = false
         window.level = .floating
-        window.ignoresMouseEvents = true // pure decoration — never blocks the user
+        window.ignoresMouseEvents = true // pure decoration, never blocks the user
         window.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary, .transient]
         window.setFrame(frame, display: true)
         splashWindow = window
@@ -198,7 +198,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
     }
 
     /// Second act: the permissions step in a normal, movable, closable window
-    /// — so macOS permission dialogs and the rest of the screen stay reachable
+    ///, so macOS permission dialogs and the rest of the screen stay reachable
     /// while it's up.
     private func showOnboardingWindow() {
         splashWindow?.orderOut(nil)
@@ -291,7 +291,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
 
     @objc private func captureRegion() { capture(shift: false) }
 
-    /// Capture a region and copy the image directly to the clipboard — no upload.
+    /// Capture a region and copy the image directly to the clipboard, no upload.
     private func captureToClipboard() {
         let fmt = settings.captureFormat == "jpg" ? "jpg" : "png"
         let tmp = FileManager.default.temporaryDirectory
@@ -301,7 +301,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         proc.executableURL = URL(fileURLWithPath: "/usr/sbin/screencapture")
         proc.arguments = ["-i", "-t", fmt, "-o", tmp.path]
         do { try proc.run(); proc.waitUntilExit() } catch {
-            showToast(.error, "Capture failed — \(error.localizedDescription)")
+            showToast(.error, "Capture failed: \(error.localizedDescription)")
             return
         }
         guard let data = try? Data(contentsOf: tmp), !data.isEmpty else { return }
@@ -315,8 +315,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         showToast(.success, "Image copied to clipboard")
     }
 
-    /// Capture a region and upload. Holding ⇧ — during the gesture *or* at any
-    /// point while selecting the region — copies the raw image link (embeds
+    /// Capture a region and upload. Holding ⇧, during the gesture *or* at any
+    /// point while selecting the region, copies the raw image link (embeds
     /// inline in Discord); without ⇧ you get the preview-card page link.
     /// (Self-host has a single link, so ⇧ is a no-op there.)
     private func capture(shift: Bool) {
@@ -330,14 +330,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         proc.executableURL = URL(fileURLWithPath: "/usr/sbin/screencapture")
         proc.arguments = ["-i", "-t", fmt, "-o", tmp.path]
         do { try proc.run(); proc.waitUntilExit() } catch {
-            showToast(.error, "Capture failed — \(error.localizedDescription)")
+            showToast(.error, "Capture failed: \(error.localizedDescription)")
             return
         }
         guard let data = try? Data(contentsOf: tmp), !data.isEmpty else { return } // cancelled
 
         // Re-sample ⇧ now that the interactive capture is done. The gesture-time
         // flag alone misses the natural habit of holding ⇧ while dragging the
-        // region, so honor either. Query the HID state directly — the main run
+        // region, so honor either. Query the HID state directly, the main run
         // loop was blocked in waitUntilExit(), so NSEvent's cache may be stale.
         let shiftNow = CGEventSource.flagsState(.combinedSessionState).contains(.maskShift)
         let raw = shift || shiftNow
@@ -353,7 +353,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
 
     /// Share the current selection. Hosted shares upload the raw text and let
     /// the viewer page render it in a single styled window (selectable, with
-    /// syntax highlighting) — no baked-in chrome, so the page doesn't show a
+    /// syntax highlighting), no baked-in chrome, so the page doesn't show a
     /// window inside a window. `raw` (⇧ + double-⌃) copies the direct .txt
     /// link instead of the viewer page. Self-host has no viewer page, so it
     /// keeps the styled window image (or plain text when raw).
@@ -361,7 +361,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         if !settings.useNabHosting, settings.makeProvider() == nil { openSettings(); return }
         // Text share is the only feature that needs Accessibility: the AX read
         // and the synthetic-⌘C fallback both require it to reach other apps.
-        // Without it, the selection reader always comes back empty — surface the
+        // Without it, the selection reader always comes back empty, surface the
         // real cause instead of a misleading "No text selected".
         guard SystemPermissions.accessibility else {
             showToast(.error, "Grant Accessibility to share text")
@@ -418,7 +418,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
                 showToast(.success, "\(kindLabel) link successfully copied to your clipboard")
             } catch {
                 NSSound.beep()
-                showToast(.error, "Upload failed — \(Self.describe(error))")
+                showToast(.error, "Upload failed: \(Self.describe(error))")
             }
         }
     }
@@ -450,7 +450,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
                 showToast(.success, "\(kindLabel) link successfully copied to your clipboard")
             } catch {
                 NSSound.beep()
-                showToast(.error, "Upload failed — \(Self.describe(error))")
+                showToast(.error, "Upload failed: \(Self.describe(error))")
             }
         }
     }

@@ -19,14 +19,14 @@ const LIMITS = [
 
 // Hosted upload for "Nab hosting". The macOS app POSTs the image bytes once,
 // authenticated by a license key. The server owns the two guarantees:
-//   #1 expiry  — x-nab-ttl (seconds, 0=never) → encoded in the pathname.
-//   #2 access  — a 131-bit token in the pathname; not enumerable by guessing.
+//   #1 expiry , x-nab-ttl (seconds, 0=never) → encoded in the pathname.
+//   #2 access , a 131-bit token in the pathname; not enumerable by guessing.
 // Returns the direct image URL (inline embed) and the viewer URL (rich card).
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
 
 export async function POST(request: Request) {
-  // Rate limit first — cheapest rejection, blocks floods before any work.
+  // Rate limit first, cheapest rejection, blocks floods before any work.
   const rl = await rateLimit(`upload:${clientIp(request)}`, LIMITS);
   if (!rl.ok) {
     return NextResponse.json(

@@ -45,7 +45,7 @@ struct WelcomeSplash: View {
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .preferredColorScheme(.dark)
         .onAppear {
-            // Gradual entrance — a slow settle, not a pop.
+            // Gradual entrance, a slow settle, not a pop.
             NSSound(named: "Submarine")?.play() // low hum to accompany the fade-in
             withAnimation(.easeOut(duration: 1.2)) { appeared = true }
             DispatchQueue.main.asyncAfter(deadline: .now() + 2.6) {
@@ -58,7 +58,7 @@ struct WelcomeSplash: View {
 
 // MARK: - Gesture guide (frosted overlay, after permissions)
 
-/// The interactive shortcut walkthrough as a clean frosted card — same look
+/// The interactive shortcut walkthrough as a clean frosted card, same look
 /// as the welcome splash, but key-capable so the practice taps register.
 /// One big liquid-glass keycap in the middle per gesture (⌘ first, then ⌃):
 /// a single tap surfaces "one more time…", a double tap turns the cap green
@@ -132,12 +132,12 @@ struct GestureGuideView: View {
         .onExitCommand { finish() }
     }
 
-    // MARK: The practice stage — one big keycap, a line of text above it.
+    // MARK: The practice stage, one big keycap, a line of text above it.
 
     private var practice: some View {
         VStack(spacing: 22) {
-            Text(stage == 0 ? "Tap ⌘ twice, quickly — captures a region"
-                            : "Now tap ⌃ twice — shares your selected text")
+            Text(stage == 0 ? "Tap ⌘ twice quickly to capture a region"
+                            : "Now tap ⌃ twice to share your selected text")
                 .font(.system(size: 13, weight: .medium)).foregroundColor(Gruv.fg3)
                 .id("hint-\(stage)")
                 .transition(.opacity)
@@ -296,12 +296,12 @@ struct OnboardingView: View {
         return VStack(alignment: .leading, spacing: 14) {
             VStack(alignment: .leading, spacing: 6) {
                 Text("Permissions").font(.mono(20, weight: .bold)).foregroundColor(Gruv.fg0)
-                Text("Three macOS permissions. Grant them here — the status updates live.")
+                Text("Three macOS permissions. Grant them here, the status updates live.")
                     .font(.system(size: 13)).foregroundColor(Gruv.fg3)
                     .fixedSize(horizontal: false, vertical: true)
             }
             PermissionRow(icon: "keyboard", tint: Gruv.orange, title: "Input Monitoring",
-                          subtitle: "For the gestures — toggle Nab on in the list.",
+                          subtitle: "For the gestures, toggle Nab on in the list.",
                           granted: listenOK, action: SystemPermissions.requestInputMonitoring)
             PermissionRow(icon: "camera.viewfinder", tint: Gruv.aqua, title: "Screen Recording",
                           subtitle: "To capture a screen region.",
@@ -310,7 +310,7 @@ struct OnboardingView: View {
                           subtitle: "To read your selected text for sharing.",
                           granted: axOK, action: SystemPermissions.requestAccessibility)
             Text(allOK
-                 ? "All granted — you're ready for the gestures."
+                 ? "All granted, you're ready for the gestures."
                  : "You can grant later too; capture still works from the menubar.")
                 .font(.system(size: 11)).foregroundColor(allOK ? Gruv.green : Gruv.gray)
                 .animation(.easeInOut, value: allOK)
@@ -341,7 +341,7 @@ struct OnboardingView: View {
         let a = SystemPermissions.accessibility
         let l = SystemPermissions.inputMonitoring
         guard s != screenOK || a != axOK || l != listenOK else { return }
-        // A little audible feedback when a permission flips green — and a
+        // A little audible feedback when a permission flips green, and a
         // brighter chime when the last one lands.
         let newlyGranted = (s && !screenOK) || (a && !axOK) || (l && !listenOK)
         withAnimation(.spring(response: 0.4, dampingFraction: 0.7)) {
@@ -356,7 +356,7 @@ struct OnboardingView: View {
 // MARK: - Vsync-animated aurora background
 
 /// Soft drifting color blobs, recomputed every display frame via
-/// TimelineView(.animation) — i.e. updated at the screen's refresh rate (vsync).
+/// TimelineView(.animation), i.e. updated at the screen's refresh rate (vsync).
 private struct AuroraBackground: View {
     var body: some View {
         TimelineView(.animation) { timeline in

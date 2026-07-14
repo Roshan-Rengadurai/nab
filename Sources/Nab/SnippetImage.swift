@@ -151,7 +151,7 @@ enum SnippetImage {
         // Operators → orange
         color("(=>|===|!==|==|!=|<=|>=|&&|\\|\\||[=+\\-*/%])", GruvNS.orange)
 
-        // Markup (JSX/HTML) — only when it looks like markup
+        // Markup (JSX/HTML), only when it looks like markup
         if text.range(of: "</?[A-Za-z][\\w.-]*[\\s/>]", options: .regularExpression) != nil {
             color("</?([A-Za-z][\\w.-]*)", GruvNS.aqua, group: 1)              // tag name
             color("\\b([A-Za-z_:][\\w:-]*)(?=\\s*=)", GruvNS.yellow, group: 1) // attribute name

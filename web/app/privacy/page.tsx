@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 
 export const metadata: Metadata = {
-  title: "Nab — Privacy Policy",
+  title: "Nab · Privacy Policy",
   description:
     "How Nab handles your data. The short version: the app is built so we never see your files.",
 };

@@ -1,7 +1,7 @@
 // Text-share rendering: classify a snippet as terminal / code / prose, then
 // highlight code with highlight.js (real language grammars + auto-detection)
-// so hosted text shares render on the viewer page — selectable, copyable, and
-// accurately colored — instead of a baked-in PNG.
+// so hosted text shares render on the viewer page, selectable, copyable, and
+// accurately colored, instead of a baked-in PNG.
 //
 // The app uploads raw text with no language hint, so we lean on highlight.js's
 // automatic language detection (restricted to a common subset for speed and
@@ -12,7 +12,7 @@ import hljs from "highlight.js";
 export type SnippetKind = "terminal" | "code" | "prose";
 
 /**
- * Count distinct Markdown signals. Kept deliberately conservative — the shell
+ * Count distinct Markdown signals. Kept deliberately conservative, the shell
  * heuristic below reads `#` and `>` line prefixes as terminal prompts, so a
  * note using Markdown headings/blockquotes would otherwise be misread as a
  * terminal. Requiring two *different* signal types avoids flipping real code or
@@ -33,7 +33,7 @@ function markdownScore(s: string): number {
 
 /** Heuristics: terminal vs code vs prose (mirrors SnippetImage.classify). */
 export function classify(s: string): SnippetKind {
-  // Markdown wins first — its heading/blockquote syntax overlaps shell prompts.
+  // Markdown wins first, its heading/blockquote syntax overlaps shell prompts.
   if (markdownScore(s) >= 2) return "prose";
 
   const lines = s.split("\n");
@@ -62,7 +62,7 @@ export function classify(s: string): SnippetKind {
   return "prose";
 }
 
-/** A short label for the snippet — its detected language, or a sensible default. */
+/** A short label for the snippet, its detected language, or a sensible default. */
 export function labelFor(kind: SnippetKind, language?: string): string {
   if (kind === "terminal") return "shell";
   if (kind === "prose") return "text";
@@ -88,7 +88,7 @@ export interface Highlighted {
 /**
  * Highlight a code/terminal snippet to safe HTML. Terminal snippets are forced
  * to `bash`; code snippets use highlight.js auto-detection over {@link SUBSET}.
- * The returned HTML is XSS-safe — highlight.js escapes the input and only its
+ * The returned HTML is XSS-safe, highlight.js escapes the input and only its
  * own `<span class="hljs-…">` wrappers are markup.
  */
 export function highlightCode(text: string, kind: SnippetKind): Highlighted {
@@ -99,7 +99,7 @@ export function highlightCode(text: string, kind: SnippetKind): Highlighted {
     const res = hljs.highlightAuto(text, SUBSET);
     return { html: res.value, language: res.language };
   } catch {
-    // Never let a highlighter hiccup 500 the page — fall back to escaped text.
+    // Never let a highlighter hiccup 500 the page, fall back to escaped text.
     return { html: escapeHtml(text) };
   }
 }

@@ -6,8 +6,8 @@ import Foundation
 public struct NabHostedUploader {
     public struct Outcome: Equatable {
         public let slug: String
-        public let imageURL: URL // direct image — embeds inline in Discord
-        public let pageURL: URL  // branded viewer — rich card
+        public let imageURL: URL // direct image, embeds inline in Discord
+        public let pageURL: URL  // branded viewer, rich card
         public let expiresAt: Int?
     }
 

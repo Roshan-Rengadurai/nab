@@ -1,6 +1,6 @@
 // Rate limiting with Upstash Redis when env vars are present; falls back to
 // in-memory (per-instance, best-effort) for local dev or when Redis isn't
-// configured. The hard bill backstop is Vercel Spend Management — set it.
+// configured. The hard bill backstop is Vercel Spend Management, set it.
 
 import { Ratelimit } from "@upstash/ratelimit";
 import { Redis } from "@upstash/redis";
@@ -16,7 +16,7 @@ export interface RateResult {
 }
 
 // ---------------------------------------------------------------------------
-// Upstash path — global across all function instances
+// Upstash path, global across all function instances
 // ---------------------------------------------------------------------------
 
 let _redis: Redis | null = null;
@@ -56,7 +56,7 @@ async function rateLimitUpstash(
 }
 
 // ---------------------------------------------------------------------------
-// In-memory fallback — per-instance, good enough for local dev
+// In-memory fallback, per-instance, good enough for local dev
 // ---------------------------------------------------------------------------
 
 type Stamps = number[];

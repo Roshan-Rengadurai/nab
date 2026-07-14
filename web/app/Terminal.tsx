@@ -16,7 +16,7 @@ export default function Terminal({
   children,
 }: {
   title: string;
-  /** Raw text to copy — defaults to the rendered children string when omitted. */
+  /** Raw text to copy, defaults to the rendered children string when omitted. */
   copyText?: string;
   children: React.ReactNode;
 }) {

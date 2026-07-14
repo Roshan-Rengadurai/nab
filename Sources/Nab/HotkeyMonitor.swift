@@ -2,7 +2,7 @@ import AppKit
 
 /// Global "tap a modifier twice" gestures via a passive CGEventTap:
 /// double-⌘ (capture) and double-⌃ (text share). Requires Input Monitoring
-/// permission. Listen-only — never swallows the user's events.
+/// permission. Listen-only, never swallows the user's events.
 ///
 /// Shift is allowed to ride along on the gesture: the fire callbacks receive
 /// whether Shift was held on the triggering tap, so callers can offer a
@@ -47,7 +47,7 @@ final class HotkeyMonitor {
             // tapCreate failed outright. Note: a `.listenOnly` tap is created
             // successfully even when untrusted for Accessibility (it just won't
             // see other apps' events), so callers must check AXIsProcessTrusted()
-            // separately — a `true` return here does not imply trust.
+            // separately, a `true` return here does not imply trust.
             return false
         }
         self.tap = tap
@@ -82,7 +82,7 @@ final class HotkeyMonitor {
         guard type == .flagsChanged else { return }
 
         let flags = event.flags
-        // Shift is intentionally NOT a disqualifier — it rides along as the "raw" modifier.
+        // Shift is intentionally NOT a disqualifier, it rides along as the "raw" modifier.
         process(modifier: .maskCommand, others: [.maskControl, .maskAlternate],
                 flags: flags, state: &cmd, fire: onCommandDouble)
         process(modifier: .maskControl, others: [.maskCommand, .maskAlternate],

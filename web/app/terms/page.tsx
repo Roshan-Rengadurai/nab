@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 
 export const metadata: Metadata = {
-  title: "Nab — Terms of Service",
+  title: "Nab · Terms of Service",
   description: "The terms for using Nab and this website.",
 };
 

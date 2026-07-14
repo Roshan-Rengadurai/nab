@@ -61,7 +61,7 @@ export default function CaptureMock() {
       });
     };
 
-    // Only animate while on-screen and the tab is visible — no wasted CPU/battery
+    // Only animate while on-screen and the tab is visible, no wasted CPU/battery
     // looping behind a scrolled-past hero or a backgrounded tab.
     let onScreen = true;
     const sync = () => {
@@ -111,7 +111,7 @@ export default function CaptureMock() {
         <span className="h-3 w-3 rounded-full bg-yellow" />
         <span className="h-3 w-3 rounded-full bg-green" />
         <span className="ml-3 font-mono text-xs text-gray">
-          screen — region capture
+          screen · region capture
         </span>
       </div>
 
@@ -123,7 +123,7 @@ export default function CaptureMock() {
           style={{ opacity: open ? 1 : 0 }}
         />
 
-        {/* crosshair guide lines — they track the drag handle */}
+        {/* crosshair guide lines, they track the drag handle */}
         <div
           className="crosshair-line pointer-events-none absolute top-0 h-full w-px bg-orange/40"
           style={{
@@ -139,7 +139,7 @@ export default function CaptureMock() {
           }}
         />
 
-        {/* the selection marquee — settles to a solid border once captured */}
+        {/* the selection marquee, settles to a solid border once captured */}
         <div
           className={`marquee pointer-events-none absolute rounded-[3px] border-2 bg-orange/10 ${
             captured
@@ -207,7 +207,7 @@ export default function CaptureMock() {
 
       </div>
 
-      {/* toast — the confirmation moment. A soft success wash sweeps the row on
+      {/* toast, the confirmation moment. A soft success wash sweeps the row on
           capture, and the whole strip lifts in, so the "copied" state reads
           without a blinding full-screen flash. */}
       <div
@@ -216,7 +216,7 @@ export default function CaptureMock() {
           captured ? "animate-toast-in" : ""
         }`}
       >
-        {/* success wash — bounded to the toast strip, fully fades */}
+        {/* success wash, bounded to the toast strip, fully fades */}
         <div
           key={captured ? `wash-${i}` : "nowash"}
           className={`pointer-events-none absolute inset-0 bg-green/10 ${

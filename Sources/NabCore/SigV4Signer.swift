@@ -100,7 +100,7 @@ public struct SigV4Signer {
         return host
     }
 
-    // Finding 4: Static formatters — allocated once, safe to share across calls.
+    // Finding 4: Static formatters, allocated once, safe to share across calls.
     private static let amzDateFormatter: DateFormatter = {
         let f = DateFormatter()
         f.locale = Locale(identifier: "en_US_POSIX")

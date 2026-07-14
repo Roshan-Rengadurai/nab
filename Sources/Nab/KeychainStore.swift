@@ -43,7 +43,7 @@ struct KeychainStore {
         SecItemDelete(query as CFDictionary)
     }
 
-    /// Touch the keychain at startup so the app loads — and is granted access to —
+    /// Touch the keychain at startup so the app loads, and is granted access to -
     /// its stored credentials under the `nab.credentials` service.
     func prime() {
         let query: [String: Any] = [

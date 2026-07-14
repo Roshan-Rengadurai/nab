@@ -16,7 +16,7 @@ export function CopyLink({ url }: { url: string }) {
       setCopied(true);
       setTimeout(() => setCopied(false), 1600);
     } catch {
-      // Clipboard blocked (insecure context / permissions) — no-op; the link
+      // Clipboard blocked (insecure context / permissions), no-op; the link
       // is visible in the address bar regardless.
     }
   }
@@ -39,7 +39,7 @@ export function CopyText({ text }: { text: string }) {
       setCopied(true);
       setTimeout(() => setCopied(false), 1600);
     } catch {
-      // Clipboard unavailable — the snippet is selectable on the page.
+      // Clipboard unavailable, the snippet is selectable on the page.
     }
   }
 
@@ -60,7 +60,7 @@ export function CopyText({ text }: { text: string }) {
  * html-to-image is imported lazily so it never weighs on the initial page load.
  */
 // OS-installed font stacks. The page's fonts come from next/font (hashed family
-// names) which don't resolve inside a serialized SVG's foreignObject — the
+// names) which don't resolve inside a serialized SVG's foreignObject, the
 // fallback there collapses to the default serif. Forcing a stack of fonts that
 // actually ship on the OS keeps the exported PNG monospaced (code) / sans
 // (prose) with correct spacing.
@@ -76,7 +76,7 @@ export function ExportPng({
 }: {
   targetId: string;
   filename: string;
-  /** True for code/terminal snippets — export in a monospace fallback. */
+  /** True for code/terminal snippets, export in a monospace fallback. */
   mono?: boolean;
 }) {
   const [busy, setBusy] = useState(false);
@@ -127,7 +127,7 @@ export function ExportPng({
       a.download = filename;
       a.click();
     } catch {
-      // Rendering failed (rare) — leave the page untouched.
+      // Rendering failed (rare), leave the page untouched.
     } finally {
       node.style.fontFamily = prevFont;
       if (scroller) {

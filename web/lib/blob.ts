@@ -1,9 +1,9 @@
 // Helpers for the hosted-upload path. Stateless: a screenshot lives at Blob
 // pathname `<expiryEpoch>-<token>`, so both the per-image expiry (#1) and the
-// unguessable access (#2) ride in the path — no database.
+// unguessable access (#2) ride in the path, no database.
 //
 //   expiryEpoch : unix seconds when the link dies; 0 = never.
-//   token       : 22 base62 chars (~131 bits) — not enumerable by guessing.
+//   token       : 22 base62 chars (~131 bits), not enumerable by guessing.
 
 const ALPHABET =
   "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
@@ -68,7 +68,7 @@ export function clampTtl(seconds: number): number {
 }
 
 /** MIME types accepted for hosted uploads (mirrors NabCore/ContentType).
- *  text/plain is the raw text-share path — rendered by the viewer page. */
+ *  text/plain is the raw text-share path, rendered by the viewer page. */
 export const ALLOWED_CONTENT_TYPES = [
   "image/png",
   "image/jpeg",

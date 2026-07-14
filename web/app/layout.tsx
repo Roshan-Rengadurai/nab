@@ -15,7 +15,7 @@ const geist = Geist({ subsets: ["latin"], variable: "--font-sans" });
 export const metadata: Metadata = {
   title: "Nab",
   description:
-    "A menubar macOS utility that turns a capture into a clean link on your clipboard — hosted either in your own object storage or on our own website. Bring your own bucket. We can never see your stuff.",
+    "A menubar macOS utility that turns a capture into a clean link on your clipboard, hosted either in your own object storage or on our own website. Bring your own bucket. We can never see your stuff.",
 };
 
 export default function RootLayout({

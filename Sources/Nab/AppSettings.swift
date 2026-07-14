@@ -32,7 +32,7 @@ final class AppSettings: ObservableObject {
     @Published var nabApiBase: String { didSet { d.set(nabApiBase, forKey: "nabApiBase") } }
     @Published var nabExpiry: String { didSet { d.set(nabExpiry, forKey: "nabExpiry") } } // never|1h|1d|7d|30d
 
-    /// Nab license key — Keychain only, never UserDefaults.
+    /// Nab license key, Keychain only, never UserDefaults.
     @Published var nabLicenseKey: String {
         didSet {
             if nabLicenseKey.isEmpty { KeychainStore.shared.delete(account: nabKeyAccount) }
@@ -51,7 +51,7 @@ final class AppSettings: ObservableObject {
         }
     }
 
-    /// Secret access key — read/write straight to Keychain, never UserDefaults.
+    /// Secret access key, read/write straight to Keychain, never UserDefaults.
     @Published var secretKey: String {
         didSet {
             if secretKey.isEmpty { KeychainStore.shared.delete(account: secretAccount) }
@@ -79,7 +79,7 @@ final class AppSettings: ObservableObject {
     @Published var toastDuration: Double { didSet { d.set(toastDuration, forKey: "toastDuration") } } // s
     @Published var toastFollowCursor: Bool { didSet { d.set(toastFollowCursor, forKey: "toastFollowCursor") } }
 
-    // App filter — where the double-tap gestures are allowed to fire.
+    // App filter, where the double-tap gestures are allowed to fire.
     //   all       : any frontmost app (default)
     //   blacklist : everywhere except the listed apps
     //   whitelist : only in the listed apps
@@ -133,7 +133,7 @@ final class AppSettings: ObservableObject {
 
     /// Whether the double-tap gestures may fire while `bundleID` is frontmost.
     /// A nil bundle ID (no identifiable frontmost app) is allowed unless the
-    /// mode is whitelist — an unknown app can't be on the list.
+    /// mode is whitelist, an unknown app can't be on the list.
     func gestureAllowed(inApp bundleID: String?) -> Bool {
         switch appFilterMode {
         case "whitelist":
@@ -153,7 +153,7 @@ final class AppSettings: ObservableObject {
             && !bucket.isEmpty && !accessKey.isEmpty && !secretKey.isEmpty
     }
 
-    /// Whether the active upload mode is ready to go — hosted mode just needs
+    /// Whether the active upload mode is ready to go, hosted mode just needs
     /// a license key; self-host needs the full provider config. Used by the
     /// launch check so Settings doesn't pop open on every start for hosted users.
     var isReadyToUpload: Bool {
@@ -183,7 +183,7 @@ final class AppSettings: ObservableObject {
     }
 
     /// Fill in the local MinIO dev target (see `~/.nab-minio`).
-    /// Dev-only credentials — never reuse for a real bucket.
+    /// Dev-only credentials, never reuse for a real bucket.
     func loadLocalDevConfig() {
         providerKind = "minio"
         endpoint = "http://localhost:9000"

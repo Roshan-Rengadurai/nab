@@ -38,7 +38,7 @@ private func cliRunCapture() -> URL {
     do { try proc.run(); proc.waitUntilExit() } catch { cliFail("screencapture failed: \(error)") }
     guard FileManager.default.fileExists(atPath: tmp.path),
           (try? Data(contentsOf: tmp))?.isEmpty == false else {
-        cliFail("Capture cancelled — no screenshot taken.")
+        cliFail("Capture cancelled, no screenshot taken.")
     }
     return tmp
 }
@@ -62,7 +62,7 @@ private func cliBuildProvider() -> S3CompatProvider {
     return S3CompatProvider(config: config, credentials: creds)
 }
 
-/// Dev helper: `Nab render-snippet <in.txt> <out.png>` — renders the
+/// Dev helper: `Nab render-snippet <in.txt> <out.png>`, renders the
 /// snippet image from a text file, for headless verification of SnippetImage.
 func runRenderSnippet(_ args: [String]) -> Never {
     guard args.count >= 3 else { cliFail("Usage: Nab render-snippet <in.txt> <out.png>") }

@@ -1,40 +1,41 @@
-import { ArrowRight, Command, Crosshair, Database, MessageSquare } from "lucide-react";
+import { ArrowRight } from "lucide-react";
 import CaptureMock from "./CaptureMock";
 import Reveal from "./Reveal";
-import Terminal from "./Terminal";
-import {
-  Tabs,
-  TabsContent,
-  TabsList,
-  TabsTrigger,
-} from "@/components/ui/tabs";
-import { Badge } from "@/components/ui/badge";
+import { DownloadCTA } from "./DownloadCTA";
 
-function FeatureCard({
-  icon: Icon,
-  iconClassName,
-  title,
-  className,
-  index = 0,
+/** One aligned line of the `nab --help` cheatsheet: key · what it does · result. */
+function HelpRow({
+  k,
   children,
+  note,
+  noteTone = "gray",
 }: {
-  icon: React.ElementType;
-  iconClassName: string;
-  title: string;
-  className?: string;
-  index?: number;
+  k: React.ReactNode;
   children: React.ReactNode;
+  note?: string;
+  noteTone?: "gray" | "orange";
 }) {
   return (
-    <div
-      className={`stagger-item card-lift rounded-2xl border border-bg2 bg-bg0-hard/40 p-6 sm:p-7 ${className ?? ""}`}
-      style={{ "--i": index } as React.CSSProperties}
-    >
-      <Icon className={`h-6 w-6 ${iconClassName}`} />
-      <h3 className="mt-4 text-lg font-semibold tracking-tight text-fg0">
-        {title}
-      </h3>
-      <div className="mt-2 leading-relaxed text-fg3">{children}</div>
+    <div className="group grid grid-cols-[5.5rem_1fr] items-baseline gap-x-5 rounded-md px-2 py-1.5 -mx-2 transition-colors hover:bg-bg1/50 sm:grid-cols-[7rem_1fr]">
+      <div className="font-mono text-sm text-orange">{k}</div>
+      <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-0.5">
+        <span className="text-fg1">{children}</span>
+        {note && (
+          <span
+            className={`font-mono text-xs ${noteTone === "orange" ? "text-orange/90" : "text-gray"}`}
+          >
+            {note}
+          </span>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function HelpGroup({ label }: { label: string }) {
+  return (
+    <div className="px-2 pt-4 pb-1 font-mono text-[11px] uppercase tracking-[0.14em] text-gray first:pt-0">
+      {label}
     </div>
   );
 }
@@ -44,7 +45,7 @@ export default function Home() {
     <div className="relative min-h-dvh font-sans">
       {/* Nav */}
       <header className="sticky top-0 z-40 border-b border-bg1/70 bg-bg0/75 backdrop-blur">
-        <nav className="mx-auto flex max-w-5xl items-center justify-between px-6 py-3.5">
+        <nav className="mx-auto flex max-w-6xl items-center justify-between px-6 py-3.5">
           <a
             href="#top"
             className="font-mono text-sm font-semibold tracking-tight text-fg0"
@@ -56,10 +57,10 @@ export default function Home() {
           </a>
           <div className="flex items-center gap-1 text-sm sm:gap-2">
             <a
-              href="#features"
+              href="#manual"
               className="hidden rounded-md px-3 py-1.5 text-fg3 transition-colors hover:text-fg0 sm:block"
             >
-              Features
+              Manual
             </a>
             <a
               href="/docs"
@@ -67,236 +68,189 @@ export default function Home() {
             >
               Docs
             </a>
-            <a
-              href="/api/download"
-              className="btn-lift btn-glow rounded-md bg-orange px-3.5 py-1.5 font-medium text-bg0-hard hover:bg-yellow"
-            >
-              Download
-            </a>
+            <DownloadCTA variant="nav" />
           </div>
         </nav>
       </header>
 
       <main id="top" className="relative overflow-hidden">
-        <div className="bg-ambient absolute inset-0 -z-10 h-215" />
+        {/* Drifting warm aurora behind the hero, the page's fluid pulse. */}
+        <div className="hero-aurora" aria-hidden="true">
+          <span className="a1" />
+          <span className="a2" />
+          <span className="a3" />
+        </div>
         <div className="bg-grid absolute inset-0 -z-10 h-215" />
 
-        {/* Hero — centered composition, staggered entrance */}
-        <section className="mx-auto flex max-w-3xl flex-col items-center px-6 pb-24 pt-20 text-center lg:pt-28">
-          <span
-            className="stagger-item inline-flex items-center gap-2 rounded-full border border-bg2 bg-bg0-hard/60 px-3 py-1 font-mono text-xs text-fg3"
-            style={{ "--i": 0 } as React.CSSProperties}
-          >
-            <span className="h-1.5 w-1.5 rounded-full bg-green" />
-            macOS menubar utility
-          </span>
-          <h1
-            className="stagger-item mt-6 text-[clamp(2.5rem,6vw,4rem)] font-bold leading-[1.05] tracking-tight text-fg0"
-            style={{ "--i": 1 } as React.CSSProperties}
-          >
-            <span className="text-underline-draw">Nab</span> it. It&apos;s
-            already on your{" "}
-            <span className="text-shimmer">clipboard</span>.
-          </h1>
-          <p
-            className="stagger-item mt-6 max-w-xl text-lg leading-relaxed text-balance text-fg1"
-            style={{ "--i": 2 } as React.CSSProperties}
-          >
-            A menubar capture tool that drops a clean link onto your clipboard
-            the instant you nab — and it previews inline in Discord and Slack.
-            Use Nab hosting out of the box, or bring your own R2 / S3 bucket.
-          </p>
-          <div
-            className="stagger-item mt-9 flex flex-wrap items-center justify-center gap-3"
-            style={{ "--i": 3 } as React.CSSProperties}
-          >
-            <a
-              href="/api/download"
-              className="btn-lift btn-glow group inline-flex items-center gap-2 rounded-lg bg-orange px-6 py-3 text-sm font-semibold text-bg0-hard hover:bg-yellow"
+        {/* Hero, asymmetric split: copy left, live capture right. Never centered. */}
+        <section className="mx-auto grid max-w-6xl grid-cols-1 items-center gap-y-14 px-6 pb-24 pt-14 lg:grid-cols-[1.05fr_1fr] lg:gap-x-16 lg:pt-24">
+          <div className="flex max-w-xl flex-col items-start">
+            <h1
+              className="stagger-item text-[clamp(2.5rem,5.4vw,4.25rem)] font-bold leading-[1.02] tracking-[-0.03em] text-fg0"
+              style={{ "--i": 0 } as React.CSSProperties}
             >
-              Download for macOS
-              <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-0.5" />
-            </a>
-            <a
-              href="/docs"
-              className="btn-lift rounded-lg border border-bg3 px-6 py-3 text-sm font-medium text-fg1 hover:border-fg3 hover:text-fg0"
+              <span className="text-underline-draw">Nab</span> it. It&apos;s
+              already on your <span className="hero-accent">clipboard</span>
+              <span className="hero-caret animate-blink" aria-hidden="true" />
+            </h1>
+            <p
+              className="stagger-item mt-6 text-lg leading-relaxed text-fg1"
+              style={{ "--i": 1 } as React.CSSProperties}
             >
-              Read the docs
-            </a>
+              A menubar capture tool that drops a clean link onto your clipboard
+              the instant you nab, and it previews inline in Discord and Slack.
+              Use Nab hosting out of the box, or bring your own R2 / S3 bucket.
+            </p>
+            <div
+              className="stagger-item mt-8 flex flex-wrap items-center gap-x-6 gap-y-3"
+              style={{ "--i": 2 } as React.CSSProperties}
+            >
+              <DownloadCTA variant="primary" />
+              <a
+                href="/docs"
+                className="group inline-flex items-center gap-1.5 text-sm font-medium text-fg3 transition-colors hover:text-fg0"
+              >
+                Read the docs
+                <ArrowRight className="h-3.5 w-3.5 transition-transform group-hover:translate-x-0.5" />
+              </a>
+            </div>
+            <p
+              className="stagger-item mt-5 font-mono text-xs text-gray"
+              style={{ "--i": 3 } as React.CSSProperties}
+            >
+              requires macOS 13+ · Apple Silicon &amp; Intel
+            </p>
           </div>
-          <p
-            className="stagger-item mt-5 font-mono text-xs text-gray"
-            style={{ "--i": 4 } as React.CSSProperties}
-          >
-            requires macOS 13+ · Apple Silicon &amp; Intel
-          </p>
 
-          {/* Product mock — centered below the copy */}
+          {/* Product mock, the pitch, playing live */}
           <div
-            className="stagger-item mt-16 w-full max-w-xl"
-            style={{ "--i": 5 } as React.CSSProperties}
+            className="stagger-item w-full lg:justify-self-end"
+            style={{ "--i": 2 } as React.CSSProperties}
           >
             <CaptureMock />
           </div>
         </section>
 
-        {/* Features */}
-        <section id="features" className="mx-auto max-w-5xl px-6 pb-28">
+        {/* The manual, the whole tool, as its own `--help` output, next to the
+            one bit of proof that matters (it unfurls inline). No feature cards. */}
+        <section id="manual" className="mx-auto max-w-6xl px-6 pb-28 pt-4">
           <Reveal>
-            <div className="mx-auto max-w-xl text-center">
-              <span className="font-mono text-sm text-orange">// why nab</span>
-              <h2 className="mt-3 text-3xl font-bold tracking-tight text-fg0 sm:text-4xl">
-                Built to disappear.
+            <div className="max-w-2xl">
+              <h2 className="text-3xl font-bold tracking-[-0.02em] text-fg0 sm:text-[2.6rem]">
+                The whole thing fits in{" "}
+                <span className="font-mono text-orange">--help</span>.
               </h2>
-              <p className="mt-4 text-lg leading-relaxed text-fg3">
-                No workflow to learn, no settings to fight before your first
-                capture lands where you need it.
+              <p className="mt-4 max-w-xl text-lg leading-relaxed text-fg3">
+                Two taps and a link on your clipboard. There&apos;s nothing to
+                learn, so here&apos;s all of it, on one screen.
               </p>
             </div>
           </Reveal>
 
-          <div className="mt-14 grid gap-4 md:grid-cols-12">
-              <FeatureCard
-                icon={Crosshair}
-                iconClassName="text-orange"
-                title="One motion, one link"
-                className="md:col-span-7"
-                index={0}
-              >
-                Drag a region or grab your current text selection — by the
-                time you let go, a clean link is already sitting on your
-                clipboard. No dialog, no export step.
-              </FeatureCard>
+          <Reveal className="mt-12">
+            <div className="grid grid-cols-1 gap-6 lg:grid-cols-[1.15fr_1fr]">
+              {/* nab --help cheatsheet, rendered as a terminal window */}
+              <div className="overflow-hidden rounded-xl border border-bg2 bg-bg0-hard shadow-2xl shadow-black/40">
+                <div className="flex items-center gap-2 border-b border-bg1 bg-bg1/60 px-4 py-2.5 font-mono text-xs text-gray">
+                  <span className="h-3 w-3 rounded-full bg-red" />
+                  <span className="h-3 w-3 rounded-full bg-yellow" />
+                  <span className="h-3 w-3 rounded-full bg-green" />
+                  <span className="ml-3">nab · the manual</span>
+                </div>
+                <div className="px-5 py-5 sm:px-6">
+                  <p className="font-mono text-sm">
+                    <span className="text-green">~/nab</span>{" "}
+                    <span className="text-gray">$</span> nab{" "}
+                    <span className="text-fg0">--help</span>
+                  </p>
+                  <div className="mt-4 space-y-1">
+                    <HelpGroup label="gestures" />
+                    <HelpRow k="⌘ ⌘" note="link copied">
+                      Capture a screen region
+                    </HelpRow>
+                    <HelpRow k="⌃ ⌃" note="link copied">
+                      Share your text selection
+                    </HelpRow>
+                    <HelpRow k="⇧ +" note="raw link">
+                      Hold Shift for the direct image / .txt
+                    </HelpRow>
 
-              <FeatureCard
-                icon={MessageSquare}
-                iconClassName="text-aqua"
-                title="Inline everywhere"
-                className="md:col-span-5"
-                index={1}
-              >
-                <p>
-                  Paste into Discord or Slack and it unfurls immediately —
-                  nobody has to click through to see what you sent.
-                </p>
-                <div className="mt-4 rounded-lg border border-bg2 bg-bg0-hard/80 p-3 font-mono text-xs">
-                  <div className="flex items-center gap-2">
-                    <span className="flex h-6 w-6 items-center justify-center rounded-full bg-orange/20 text-[10px] font-bold text-orange">
-                      JD
+                    <HelpGroup label="where links live" />
+                    <HelpRow k="hosted" note="default" noteTone="orange">
+                      Zero config, links last 30 days
+                    </HelpRow>
+                    <HelpRow k="bucket" note="optional">
+                      Your R2 / S3, links never expire
+                    </HelpRow>
+
+                    <HelpGroup label="runs in" />
+                    <HelpRow k="menubar" note="✂">
+                      No dock icon, no window to manage
+                    </HelpRow>
+                  </div>
+                </div>
+              </div>
+
+              {/* The proof: a shared link unfurling inline in chat */}
+              <div className="flex flex-col justify-center gap-4">
+                <div className="rounded-xl border border-bg2 bg-bg0-hard/60 p-4 font-mono text-sm">
+                  <div className="flex items-center gap-2.5">
+                    <span className="flex h-8 w-8 items-center justify-center rounded-full bg-orange/20 text-xs font-bold text-orange">
+                      jae
                     </span>
                     <span className="font-semibold text-fg1">jae</span>
-                    <span className="text-gray">today at 2:14 PM</span>
+                    <span className="text-xs text-gray">today at 2:14 PM</span>
                   </div>
-                  <p className="mt-1.5 text-fg3">
-                    check this out — nab.sh/aB3x9.png
+                  <p className="mt-2 pl-[2.75rem] text-fg3">
+                    found the bug -{" "}
+                    <span className="text-blue underline decoration-bg3 underline-offset-2">
+                      nab.sh/aB3x9.png
+                    </span>
                   </p>
-                  <div className="mt-2 h-20 w-full rounded-md bg-[repeating-linear-gradient(45deg,#32302f_0_10px,#282828_10px_20px)]" />
+                  <div className="mt-2 ml-[2.75rem] overflow-hidden rounded-lg border border-bg2">
+                    <div className="flex items-center gap-1.5 border-b border-bg1 bg-bg1/50 px-3 py-1.5 text-[11px] text-gray">
+                      <span className="h-2 w-2 rounded-full bg-red" />
+                      <span className="h-2 w-2 rounded-full bg-yellow" />
+                      <span className="h-2 w-2 rounded-full bg-green" />
+                      <span className="ml-1.5">aB3x9.png</span>
+                    </div>
+                    <div className="h-28 w-full bg-[repeating-linear-gradient(45deg,#32302f_0_11px,#282828_11px_22px)]" />
+                  </div>
                 </div>
-              </FeatureCard>
-
-              <FeatureCard
-                icon={Database}
-                iconClassName="text-yellow"
-                title="Your bucket, your rules"
-                className="md:col-span-5"
-                index={2}
-              >
-                <p>
-                  Hosted by default, so links work immediately. Connect
-                  Cloudflare R2 or any S3-compatible bucket and links stop
-                  expiring.
+                <p className="px-1 text-sm leading-relaxed text-fg3">
+                  No click-through, no “open in browser.” The link unfurls into
+                  the image right where you paste it, Discord, Slack, a GitHub
+                  comment.
                 </p>
-                <a
-                  href="#self-host"
-                  className="mt-4 inline-flex items-center gap-1.5 text-sm font-medium text-orange transition-colors hover:text-yellow"
-                >
-                  See self-host setup
-                  <ArrowRight className="h-3.5 w-3.5" />
-                </a>
-              </FeatureCard>
-
-              <FeatureCard
-                icon={Command}
-                iconClassName="text-green"
-                title="Lives in your menubar"
-                className="md:col-span-7"
-                index={3}
-              >
-                <p>
-                  No dock icon, no window to manage. It sits in your menubar
-                  until you need it.
-                </p>
-                <div className="mt-4 flex flex-wrap gap-2">
-                  <Badge variant="secondary" className="font-mono">
-                    ⌘⌘ region
-                  </Badge>
-                  <Badge variant="secondary" className="font-mono">
-                    ⌃⌃ text selection
-                  </Badge>
-                </div>
-              </FeatureCard>
+              </div>
             </div>
+          </Reveal>
         </section>
 
-        {/* Hosted vs. self-host */}
+        {/* Closing, a shell prompt, not a “ready to get started?” billboard */}
         <Reveal>
-          <section id="self-host" className="px-6 pb-28">
-            <div className="mx-auto max-w-3xl text-center">
-              <h2 className="text-3xl font-bold tracking-tight text-fg0 sm:text-4xl">
-                Start nabbing in seconds.
-              </h2>
-              <p className="mx-auto mt-4 max-w-lg text-lg leading-relaxed text-fg3">
-                Nab hosts your links for free — nothing to set up. Want full
-                control instead? Point it at your own R2 or S3 bucket.
+          <section className="mx-auto max-w-6xl px-6 pb-24">
+            <div className="flex flex-col items-start justify-between gap-6 border-t border-bg2 pt-12 sm:flex-row sm:items-center">
+              <p className="font-mono text-lg text-fg1 sm:text-xl">
+                <span className="text-green">~/nab</span>{" "}
+                <span className="text-gray">$</span> your next screenshot is a
+                link
+                <span className="ml-1 inline-block animate-blink text-orange">
+                  ▋
+                </span>
               </p>
-            </div>
-
-            <div className="bg-ambient mx-auto mt-10 max-w-3xl rounded-2xl border border-bg2 bg-bg0-hard/40 p-6 sm:p-8">
-              <Tabs defaultValue="hosted" className="items-center">
-                <TabsList>
-                  <TabsTrigger value="hosted">Hosted</TabsTrigger>
-                  <TabsTrigger value="self-host">Self-host</TabsTrigger>
-                </TabsList>
-                <TabsContent value="hosted" className="mt-6 w-full">
-                  <Terminal title="zero config">
-                    {`✂  tap ⌘ twice → drag a region
-✓  link copied — nab.sh/aB3x9.png
-
-no account, no bucket, nothing to configure.
-hosted links expire after 30 days.`}
-                  </Terminal>
-                </TabsContent>
-                <TabsContent value="self-host" className="mt-6 w-full">
-                  <Terminal title="Settings → Storage">
-                    {`Endpoint   https://<ACCOUNT_ID>.r2.cloudflarestorage.com
-Bucket     shots
-Region     auto
-
-your bucket, your links — they never expire.`}
-                  </Terminal>
-                </TabsContent>
-              </Tabs>
-            </div>
-
-            <div className="mt-8 text-center">
-              <a
-                href="/docs"
-                className="btn-lift inline-flex items-center gap-2 rounded-lg border border-bg3 px-6 py-3 text-sm font-medium text-fg1 hover:border-fg3 hover:text-fg0"
-              >
-                Read the setup guide
-                <ArrowRight className="h-4 w-4" />
-              </a>
+              <DownloadCTA variant="primary" className="shrink-0" />
             </div>
           </section>
         </Reveal>
 
-        {/* Footer — TUI modeline */}
+        {/* Footer, TUI modeline */}
         <footer className="border-t border-bg2 bg-bg0-hard">
-          <div className="mx-auto flex max-w-5xl flex-wrap items-center gap-x-4 gap-y-1 px-6 py-3 font-mono text-xs">
+          <div className="mx-auto flex max-w-6xl flex-wrap items-center gap-x-4 gap-y-1 px-6 py-3 font-mono text-xs">
             <span className="rounded bg-orange px-2 py-0.5 font-semibold text-bg0-hard">
               NORMAL
             </span>
-            <span className="text-fg1">nab 0.1.0</span>
+            <span className="text-fg1">nab 0.2.2</span>
             <span className="text-gray">hosted or self-host</span>
             <a href="/privacy" className="text-gray transition-colors hover:text-fg0">
               privacy

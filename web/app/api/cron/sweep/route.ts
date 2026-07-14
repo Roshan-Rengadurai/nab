@@ -2,7 +2,7 @@ import { list, del } from "@vercel/blob";
 import { NextResponse } from "next/server";
 import { isExpired } from "@/lib/blob";
 
-// Daily sweep — deletes blobs whose per-image expiry (encoded in the pathname)
+// Daily sweep, deletes blobs whose per-image expiry (encoded in the pathname)
 // has passed. Slugs with expiry 0 (never) are kept. Registered as a Vercel Cron
 // in vercel.json; Vercel sends `Authorization: Bearer <CRON_SECRET>`.
 export const dynamic = "force-dynamic";

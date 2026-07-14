@@ -15,7 +15,7 @@ const TITLE = "Shared with Nab";
 const DESC = "A screenshot shared with Nab.";
 const TEXT_DESC = "A snippet shared with Nab.";
 
-/** Node id of the snippet card — the PNG export captures this element. */
+/** Node id of the snippet card, the PNG export captures this element. */
 const CAPTURE_ID = "snippet-capture";
 
 /** Human label for the slug's expiry, e.g. "expires Jun 30" or "never expires". */
@@ -42,7 +42,7 @@ export async function generateMetadata({ params }: Params): Promise<Metadata> {
   try {
     text = isTextShare((await head(img)).contentType);
   } catch {
-    // Missing/expired — the page 404s; metadata just falls back to the image shape.
+    // Missing/expired, the page 404s; metadata just falls back to the image shape.
   }
   const desc = text ? TEXT_DESC : DESC;
   return {
@@ -126,7 +126,7 @@ export default async function ScreenshotPage({ params }: Params) {
 
       <main className="mx-auto flex w-full max-w-4xl flex-1 flex-col px-6 py-10">
         {snippet ? (
-          // Text snippet — clean bordered card, no window titlebar.
+          // Text snippet, clean bordered card, no window titlebar.
           <div
             id={CAPTURE_ID}
             className="overflow-hidden rounded-xl border border-bg2 bg-bg0-hard shadow-2xl shadow-black/40"
@@ -147,7 +147,7 @@ export default async function ScreenshotPage({ params }: Params) {
             )}
           </div>
         ) : (
-          // Image share — keep the window-chrome frame around the screenshot.
+          // Image share, keep the window-chrome frame around the screenshot.
           <figure className="overflow-hidden rounded-xl border border-bg2 bg-bg0-hard shadow-2xl shadow-black/40">
             <div className="flex items-center gap-2 border-b border-bg1 bg-bg1/60 px-4 py-2.5">
               <span className="h-3 w-3 rounded-full bg-red" />
@@ -201,7 +201,7 @@ export default async function ScreenshotPage({ params }: Params) {
         </div>
       </main>
 
-      {/* Footer — TUI modeline */}
+      {/* Footer, TUI modeline */}
       <footer className="border-t border-bg2 bg-bg0-hard">
         <div className="mx-auto flex max-w-4xl flex-wrap items-center gap-x-4 gap-y-1 px-6 py-3 font-mono text-xs">
           <span className="rounded bg-orange px-2 py-0.5 font-semibold text-bg0-hard">
