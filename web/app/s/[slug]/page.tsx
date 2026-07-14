@@ -2,15 +2,21 @@ import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { head, BlobNotFoundError } from "@vercel/blob";
 import { ArrowUpRight, Download } from "lucide-react";
+import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
+import remarkBreaks from "remark-breaks";
 import { expiryOf, imageUrl, isExpired, isValidSlug, pageUrl } from "@/lib/blob";
-import { classify, highlight, titleFor } from "@/lib/snippet";
-import CopyLink from "./Actions";
+import { classify, highlightCode, labelFor } from "@/lib/snippet";
+import { CopyLink, CopyText, ExportPng } from "./Actions";
 
 type Params = { params: Promise<{ slug: string }> };
 
 const TITLE = "Shared with Nab";
 const DESC = "A screenshot shared with Nab.";
 const TEXT_DESC = "A snippet shared with Nab.";
+
+/** Node id of the snippet card — the PNG export captures this element. */
+const CAPTURE_ID = "snippet-capture";
 
 /** Human label for the slug's expiry, e.g. "expires Jun 30" or "never expires". */
 function expiryLabel(slug: string): string {
@@ -74,15 +80,30 @@ export default async function ScreenshotPage({ params }: Params) {
     throw err;
   }
 
-  // Raw text share → render it in this page's window chrome with gruvbox
-  // highlighting (selectable, copyable) — one window, not a window-in-a-window.
-  let snippet: { kind: ReturnType<typeof classify>; text: string } | null = null;
+  // Raw text share → render it inline (selectable, copyable, exportable) with
+  // proper syntax highlighting for code / Markdown for prose. No window chrome:
+  // just the snippet on a clean card.
+  type Snippet = {
+    kind: ReturnType<typeof classify>;
+    text: string;
+    html?: string;
+    language?: string;
+  };
+  let snippet: Snippet | null = null;
   if (isTextShare(contentType)) {
     const res = await fetch(img, { cache: "no-store" });
     if (!res.ok) notFound();
     const text = await res.text();
-    snippet = { kind: classify(text), text };
+    const kind = classify(text);
+    if (kind === "prose") {
+      snippet = { kind, text };
+    } else {
+      const hl = highlightCode(text, kind);
+      snippet = { kind, text, html: hl.html, language: hl.language };
+    }
   }
+
+  const langLabel = snippet ? labelFor(snippet.kind, snippet.language) : null;
 
   return (
     <div className="relative flex min-h-dvh flex-col font-sans">
@@ -104,66 +125,79 @@ export default async function ScreenshotPage({ params }: Params) {
       </header>
 
       <main className="mx-auto flex w-full max-w-4xl flex-1 flex-col px-6 py-10">
-        {/* Window-chrome frame around the shot / snippet */}
-        <figure className="overflow-hidden rounded-xl border border-bg2 bg-bg0-hard shadow-2xl shadow-black/40">
-          <div className="flex items-center gap-2 border-b border-bg1 bg-bg1/60 px-4 py-2.5">
-            <span className="h-3 w-3 rounded-full bg-red" />
-            <span className="h-3 w-3 rounded-full bg-yellow" />
-            <span className="h-3 w-3 rounded-full bg-green" />
-            <span className="ml-3 truncate font-mono text-xs text-gray">
-              {snippet ? titleFor(snippet.kind) : slug}
-            </span>
-          </div>
-          {snippet ? (
-            snippet.kind === "prose" ? (
-              <div className="max-h-[70dvh] overflow-auto px-6 py-5 text-[15px] leading-7 whitespace-pre-wrap text-fg1">
-                {snippet.text}
+        {snippet ? (
+          // Text snippet — clean bordered card, no window titlebar.
+          <div
+            id={CAPTURE_ID}
+            className="overflow-hidden rounded-xl border border-bg2 bg-bg0-hard shadow-2xl shadow-black/40"
+          >
+            {snippet.kind === "prose" ? (
+              <div className="snippet-prose max-h-[70dvh] overflow-auto px-7 py-6">
+                <ReactMarkdown remarkPlugins={[remarkGfm, remarkBreaks]}>
+                  {snippet.text}
+                </ReactMarkdown>
               </div>
             ) : (
-              <pre className="max-h-[70dvh] overflow-auto px-6 py-5 font-mono text-sm leading-6 text-fg1">
-                <code>
-                  {highlight(snippet.text).map((t, i) =>
-                    t.className ? (
-                      <span key={i} className={t.className}>
-                        {t.text}
-                      </span>
-                    ) : (
-                      t.text
-                    ),
-                  )}
-                </code>
+              <pre className="max-h-[70dvh] overflow-auto px-6 py-5 font-mono text-sm leading-6">
+                <code
+                  className="hljs bg-transparent"
+                  dangerouslySetInnerHTML={{ __html: snippet.html ?? "" }}
+                />
               </pre>
-            )
-          ) : (
-            // eslint-disable-next-line @next/next/no-img-element
+            )}
+          </div>
+        ) : (
+          // Image share — keep the window-chrome frame around the screenshot.
+          <figure className="overflow-hidden rounded-xl border border-bg2 bg-bg0-hard shadow-2xl shadow-black/40">
+            <div className="flex items-center gap-2 border-b border-bg1 bg-bg1/60 px-4 py-2.5">
+              <span className="h-3 w-3 rounded-full bg-red" />
+              <span className="h-3 w-3 rounded-full bg-yellow" />
+              <span className="h-3 w-3 rounded-full bg-green" />
+              <span className="ml-3 truncate font-mono text-xs text-gray">{slug}</span>
+            </div>
+            {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
               src={img}
               alt="Screenshot shared with Nab"
               className="mx-auto block max-h-[70dvh] w-auto max-w-full bg-bg0-hard object-contain"
             />
-          )}
-        </figure>
+          </figure>
+        )}
 
         {/* Actions */}
         <div className="mt-6 flex flex-wrap items-center gap-3">
-          <a
-            href={img}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="btn-lift inline-flex items-center gap-2 rounded-lg border border-bg3 px-4 py-2 font-mono text-sm text-fg1 hover:border-fg3 hover:text-fg0"
-          >
-            <ArrowUpRight className="h-4 w-4" />
-            open original
-          </a>
-          <a
-            href={img}
-            download
-            className="btn-lift inline-flex items-center gap-2 rounded-lg border border-bg3 px-4 py-2 font-mono text-sm text-fg1 hover:border-fg3 hover:text-fg0"
-          >
-            <Download className="h-4 w-4" />
-            download
-          </a>
-          <CopyLink url={pageUrl(slug)} />
+          {snippet ? (
+            <>
+              <CopyText text={snippet.text} />
+              <ExportPng
+                targetId={CAPTURE_ID}
+                filename={`nab-${slug}.png`}
+                mono={snippet.kind !== "prose"}
+              />
+              <CopyLink url={pageUrl(slug)} />
+            </>
+          ) : (
+            <>
+              <a
+                href={img}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="btn-lift inline-flex items-center gap-2 rounded-lg border border-bg3 px-4 py-2 font-mono text-sm text-fg1 hover:border-fg3 hover:text-fg0"
+              >
+                <ArrowUpRight className="h-4 w-4" />
+                open original
+              </a>
+              <a
+                href={img}
+                download
+                className="btn-lift inline-flex items-center gap-2 rounded-lg border border-bg3 px-4 py-2 font-mono text-sm text-fg1 hover:border-fg3 hover:text-fg0"
+              >
+                <Download className="h-4 w-4" />
+                download
+              </a>
+              <CopyLink url={pageUrl(slug)} />
+            </>
+          )}
         </div>
       </main>
 
@@ -174,6 +208,7 @@ export default async function ScreenshotPage({ params }: Params) {
             NORMAL
           </span>
           <span className="text-fg1">shared with nab</span>
+          {langLabel && <span className="text-aqua">{langLabel}</span>}
           <span className="text-gray">{expiryLabel(slug)}</span>
           <a href="/" className="ml-auto text-gray transition-colors hover:text-fg0">
             ~/nab

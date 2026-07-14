@@ -359,6 +359,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
     /// keeps the styled window image (or plain text when raw).
     private func shareText(raw: Bool) {
         if !settings.useNabHosting, settings.makeProvider() == nil { openSettings(); return }
+        // Text share is the only feature that needs Accessibility: the AX read
+        // and the synthetic-⌘C fallback both require it to reach other apps.
+        // Without it, the selection reader always comes back empty — surface the
+        // real cause instead of a misleading "No text selected".
+        guard SystemPermissions.accessibility else {
+            showToast(.error, "Grant Accessibility to share text")
+            SystemPermissions.requestAccessibility()
+            return
+        }
         DispatchQueue.global(qos: .userInitiated).async { [weak self] in
             let selected = SelectionReader.currentSelectedText()
             DispatchQueue.main.async {

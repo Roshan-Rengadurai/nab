@@ -1,12 +1,41 @@
-// Text-share rendering: classification + gruvbox syntax highlighting.
-// A TypeScript port of the app's SnippetImage classifier/highlighter
-// (Sources/Nab/SnippetImage.swift) so hosted text shares render on the viewer
-// page — selectable, copyable, and styled — instead of a baked-in PNG.
+// Text-share rendering: classify a snippet as terminal / code / prose, then
+// highlight code with highlight.js (real language grammars + auto-detection)
+// so hosted text shares render on the viewer page — selectable, copyable, and
+// accurately colored — instead of a baked-in PNG.
+//
+// The app uploads raw text with no language hint, so we lean on highlight.js's
+// automatic language detection (restricted to a common subset for speed and
+// fewer misfires). Prose is rendered as Markdown by the page, not here.
+
+import hljs from "highlight.js";
 
 export type SnippetKind = "terminal" | "code" | "prose";
 
-/** Same heuristics as SnippetImage.classify: terminal vs code vs prose. */
+/**
+ * Count distinct Markdown signals. Kept deliberately conservative — the shell
+ * heuristic below reads `#` and `>` line prefixes as terminal prompts, so a
+ * note using Markdown headings/blockquotes would otherwise be misread as a
+ * terminal. Requiring two *different* signal types avoids flipping real code or
+ * a stray `#` comment into prose.
+ */
+function markdownScore(s: string): number {
+  let n = 0;
+  if (/^#{1,6}\s+\S/m.test(s)) n++; // heading
+  if (/\*\*[^*\n]+\*\*/.test(s)) n++; // **bold**
+  if (/(?<!\!)\[[^\]\n]+\]\([^)\n]+\)/.test(s)) n++; // [text](url) link
+  if (/(^|\n)```/.test(s)) n += 2; // fenced code block (strong)
+  if ((s.match(/^[ \t]*[-*+]\s+\S/gm) || []).length >= 2) n++; // bullet list
+  if ((s.match(/^[ \t]*\d+\.\s+\S/gm) || []).length >= 2) n++; // ordered list
+  if (/^>\s+\S/m.test(s)) n++; // blockquote
+  if (/`[^`\n]+`/.test(s)) n++; // inline code
+  return n;
+}
+
+/** Heuristics: terminal vs code vs prose (mirrors SnippetImage.classify). */
 export function classify(s: string): SnippetKind {
+  // Markdown wins first — its heading/blockquote syntax overlaps shell prompts.
+  if (markdownScore(s) >= 2) return "prose";
+
   const lines = s.split("\n");
   let codeScore = 0;
   let termScore = 0;
@@ -33,87 +62,51 @@ export function classify(s: string): SnippetKind {
   return "prose";
 }
 
-/** Window-chrome title, mirroring the app: zsh / snippet / note. */
-export function titleFor(kind: SnippetKind): string {
-  return kind === "terminal" ? "zsh" : kind === "code" ? "snippet" : "note";
+/** A short label for the snippet — its detected language, or a sensible default. */
+export function labelFor(kind: SnippetKind, language?: string): string {
+  if (kind === "terminal") return "shell";
+  if (kind === "prose") return "text";
+  return language && language.length ? language : "code";
 }
 
-export interface Token {
-  text: string;
-  /** Tailwind classes; undefined = default foreground. */
-  className?: string;
+// Languages highlight.js may auto-detect against. A curated subset keeps
+// detection fast and cuts down on exotic-language false positives.
+const SUBSET = [
+  "javascript", "typescript", "python", "bash", "shell", "json", "xml",
+  "css", "scss", "go", "rust", "c", "cpp", "csharp", "java", "kotlin",
+  "swift", "ruby", "php", "sql", "yaml", "toml", "markdown", "diff",
+  "dockerfile", "makefile", "objectivec", "lua", "r", "perl", "graphql",
+];
+
+export interface Highlighted {
+  /** Safe HTML: highlight.js escapes the source text and wraps tokens in spans. */
+  html: string;
+  /** The detected (or forced) language, when known. */
+  language?: string;
 }
 
-// Highlight rules in application order — later rules override earlier ones,
-// exactly like the repeated color() passes in SnippetImage.highlighted.
-interface Rule {
-  re: RegExp;
-  className: string;
-  group?: number;
-}
-
-const RULES: Rule[] = [
-  // Types (Capitalized identifiers) → yellow
-  { re: /\b[A-Z][A-Za-z0-9_]*\b/g, className: "text-yellow" },
-  // Function calls → blue, bold
-  { re: /\b([A-Za-z_][A-Za-z0-9_]*)\s*(?=\()/g, className: "text-blue font-bold", group: 1 },
-  // Control keywords → red, bold
-  { re: /\b(if|else|for|while|do|switch|case|default|break|continue|return|try|catch|finally|throw|await|async|yield|in|of)\b/g, className: "text-red font-bold" },
-  // Declaration / storage keywords → orange, bold
-  { re: /\b(let|const|var|func|function|def|class|struct|enum|interface|type|import|export|from|as|public|private|protected|static|extends|implements|new|namespace|package)\b/g, className: "text-orange font-bold" },
-  // Shell builtins → aqua
-  { re: /\b(echo|cd|sudo|npm|npx|yarn|git|ls|cat|grep|export|brew|curl|mkdir|rm|cp|mv|mc|minio)\b/g, className: "text-aqua" },
-  // Constants / booleans → purple
-  { re: /\b(true|false|null|nil|None|undefined|this|self|super)\b/g, className: "text-purple" },
-  // Numbers → purple
-  { re: /\b\d+(?:\.\d+)?\b/g, className: "text-purple" },
-  // Operators → orange
-  { re: /(=>|===|!==|==|!=|<=|>=|&&|\|\||[=+\-*/%])/g, className: "text-orange" },
-];
-
-const MARKUP_RULES: Rule[] = [
-  // Tag names → aqua
-  { re: /<\/?([A-Za-z][\w.-]*)/g, className: "text-aqua", group: 1 },
-  // Attribute names → yellow
-  { re: /\b([A-Za-z_:][\w:-]*)(?=\s*=)/g, className: "text-yellow", group: 1 },
-];
-
-const LATE_RULES: Rule[] = [
-  // Strings → green (override tokens inside)
-  { re: /"(?:[^"\\]|\\.)*"|'(?:[^'\\]|\\.)*'|`(?:[^`\\]|\\.)*`/g, className: "text-green" },
-  // Comments → gray italic (override everything inside)
-  { re: /(\/\/[^\n]*|#[^\n]*)$/gm, className: "text-gray italic" },
-];
-
-/** Tokenize `text` into styled runs for code/terminal snippets. */
-export function highlight(text: string): Token[] {
-  // Per-character class map; later rules overwrite earlier ones.
-  const styles: (string | undefined)[] = new Array(text.length).fill(undefined);
-
-  const rules = [...RULES];
-  if (/<\/?[A-Za-z][\w.-]*[\s/>]/.test(text)) rules.push(...MARKUP_RULES);
-  rules.push(...LATE_RULES);
-
-  for (const rule of rules) {
-    rule.re.lastIndex = 0;
-    for (const m of text.matchAll(rule.re)) {
-      const g = rule.group ?? 0;
-      const s = rule.group != null ? m[g] : m[0];
-      if (s == null) continue;
-      // Compute the group's offset within the whole match (first occurrence).
-      const start = (m.index ?? 0) + (rule.group != null ? m[0].indexOf(s) : 0);
-      for (let i = start; i < start + s.length; i++) styles[i] = rule.className;
+/**
+ * Highlight a code/terminal snippet to safe HTML. Terminal snippets are forced
+ * to `bash`; code snippets use highlight.js auto-detection over {@link SUBSET}.
+ * The returned HTML is XSS-safe — highlight.js escapes the input and only its
+ * own `<span class="hljs-…">` wrappers are markup.
+ */
+export function highlightCode(text: string, kind: SnippetKind): Highlighted {
+  try {
+    if (kind === "terminal") {
+      return { html: hljs.highlight(text, { language: "bash" }).value, language: "shell" };
     }
+    const res = hljs.highlightAuto(text, SUBSET);
+    return { html: res.value, language: res.language };
+  } catch {
+    // Never let a highlighter hiccup 500 the page — fall back to escaped text.
+    return { html: escapeHtml(text) };
   }
+}
 
-  // Merge consecutive characters with identical styling into runs.
-  const tokens: Token[] = [];
-  let runStart = 0;
-  for (let i = 1; i <= text.length; i++) {
-    if (i === text.length || styles[i] !== styles[runStart]) {
-      tokens.push({ text: text.slice(runStart, i), className: styles[runStart] });
-      runStart = i;
-    }
-  }
-  return tokens;
+function escapeHtml(s: string): string {
+  return s
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;");
 }
