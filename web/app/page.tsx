@@ -174,6 +174,12 @@ export default function Home() {
                     <HelpRow k="⇧ +" note="raw link">
                       Hold Shift for the direct image / .txt
                     </HelpRow>
+                    <HelpRow k="⌥ + ⌘⌘" note="saved to disk">
+                      Hold Option to save to a folder, no upload
+                    </HelpRow>
+                    <HelpRow k="⌘⌃ ⌘⌃" note="no upload">
+                      Copy the image straight to your clipboard
+                    </HelpRow>
 
                     <HelpGroup label="where links live" />
                     <HelpRow k="hosted" note="default" noteTone="orange">
