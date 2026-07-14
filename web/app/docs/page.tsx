@@ -224,6 +224,13 @@ mc anonymous set download nabdev/shots`}
                 : share the current text selection → link copied.
               </Li>
               <Li>
+                <span className="rounded bg-bg2 px-2 py-1 font-mono text-xs text-fg0">
+                  hold ⌥ + tap ⌘ twice
+                </span>
+                : capture a region → saved to your folder instead of uploaded.
+                Pick the folder in Settings → Capture.
+              </Li>
+              <Li>
                 <span className="font-mono text-xs text-fg0">menubar ✂</span>:
                 same actions plus Settings, anytime.
               </Li>
@@ -269,7 +276,7 @@ mc anonymous set download nabdev/shots`}
           <span className="rounded bg-orange px-2 py-0.5 font-semibold text-bg0-hard">
             NORMAL
           </span>
-          <span className="text-fg1">nab 0.2.2</span>
+          <span className="text-fg1">nab 0.3.0</span>
           <span className="text-gray">setup guide</span>
           <a href="/" className="ml-auto cursor-pointer text-gray hover:text-fg0">
             ~/home

@@ -13,7 +13,7 @@
 # Developer account.
 set -euo pipefail
 
-VERSION="${1:-0.2.0}"
+VERSION="${1:-0.3.0}"
 APP_NAME="Nab"
 BUNDLE_ID="com.nabapp.Nab"
 VOL_NAME="Nab"

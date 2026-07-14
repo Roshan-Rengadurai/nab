@@ -250,7 +250,7 @@ export default function Home() {
             <span className="rounded bg-orange px-2 py-0.5 font-semibold text-bg0-hard">
               NORMAL
             </span>
-            <span className="text-fg1">nab 0.2.2</span>
+            <span className="text-fg1">nab 0.3.0</span>
             <span className="text-gray">hosted or self-host</span>
             <a href="/privacy" className="text-gray transition-colors hover:text-fg0">
               privacy

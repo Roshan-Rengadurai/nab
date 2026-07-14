@@ -64,6 +64,28 @@ final class AppSettings: ObservableObject {
     @Published var autoDeleteAfterUpload: Bool { didSet { d.set(autoDeleteAfterUpload, forKey: "autoDeleteAfterUpload") } }
     @Published var retinaDownscale: Bool { didSet { d.set(retinaDownscale, forKey: "retinaDownscale") } }
 
+    // Local save (hold ⌥ while double-tapping ⌘)
+    @Published var optionSaveLocally: Bool { didSet { d.set(optionSaveLocally, forKey: "optionSaveLocally") } }
+    /// Destination folder for ⌥ captures. Empty means the fallback below.
+    @Published var saveFolder: String { didSet { d.set(saveFolder, forKey: "saveFolder") } }
+
+    /// Where an ⌥ capture is written. Falls back to the Desktop, where macOS
+    /// puts screenshots, when the user hasn't picked a folder.
+    var saveFolderURL: URL {
+        if !saveFolder.isEmpty {
+            return URL(fileURLWithPath: (saveFolder as NSString).expandingTildeInPath)
+        }
+        return FileManager.default.urls(for: .desktopDirectory, in: .userDomainMask).first
+            ?? FileManager.default.homeDirectoryForCurrentUser
+    }
+
+    /// Home-relative path for the folder, for display in Settings.
+    var saveFolderDisplay: String {
+        let path = saveFolderURL.path
+        let home = FileManager.default.homeDirectoryForCurrentUser.path
+        return path.hasPrefix(home) ? "~" + path.dropFirst(home.count) : path
+    }
+
     // Sharing
     @Published var slugLength: Double { didSet { d.set(slugLength, forKey: "slugLength") } }
     @Published var datePrefix: Bool { didSet { d.set(datePrefix, forKey: "datePrefix") } }
@@ -110,6 +132,8 @@ final class AppSettings: ObservableObject {
         captureFormat = d.string(forKey: "captureFormat") ?? "png"
         autoDeleteAfterUpload = d.object(forKey: "autoDeleteAfterUpload") as? Bool ?? true
         retinaDownscale = d.bool(forKey: "retinaDownscale")
+        optionSaveLocally = d.object(forKey: "optionSaveLocally") as? Bool ?? true
+        saveFolder = d.string(forKey: "saveFolder") ?? ""
         slugLength = d.object(forKey: "slugLength") as? Double ?? 10
         datePrefix = d.bool(forKey: "datePrefix")
         defaultBurner = d.bool(forKey: "defaultBurner")

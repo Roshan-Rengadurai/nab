@@ -132,6 +132,53 @@ struct FieldRow: View {
     }
 }
 
+// MARK: - Folder picker row
+
+/// A card showing the currently chosen folder with a button that opens an
+/// NSOpenPanel. Selecting the folder in the panel is also what grants Nab
+/// access to it, so protected locations (Desktop, Documents) work without a
+/// separate permission prompt.
+struct FolderRow: View {
+    let title: String
+    var subtitle: String? = nil
+    let path: String
+    let onPick: (URL) -> Void
+
+    var body: some View {
+        Card {
+            HStack(spacing: 12) {
+                VStack(alignment: .leading, spacing: 3) {
+                    Text(title).font(.system(size: 13, weight: .medium)).foregroundColor(Gruv.fg1)
+                    Text(path).font(.mono(11)).foregroundColor(Gruv.fg3)
+                        .lineLimit(1).truncationMode(.head)
+                    if let subtitle {
+                        Text(subtitle).font(.system(size: 11)).foregroundColor(Gruv.gray)
+                    }
+                }
+                Spacer(minLength: 8)
+                Button(action: pick) {
+                    Text("Choose…").font(.system(size: 12, weight: .medium)).foregroundColor(Gruv.orange)
+                        .padding(.horizontal, 10).padding(.vertical, 6)
+                        .background(RoundedRectangle(cornerRadius: 7).fill(Gruv.orange.opacity(0.12)))
+                }
+                .buttonStyle(.plain)
+            }
+        }
+    }
+
+    private func pick() {
+        let panel = NSOpenPanel()
+        panel.title = "Choose Save Folder"
+        panel.canChooseDirectories = true
+        panel.canChooseFiles = false
+        panel.canCreateDirectories = true
+        panel.allowsMultipleSelection = false
+        panel.directoryURL = URL(fileURLWithPath: (path as NSString).expandingTildeInPath)
+        guard panel.runModal() == .OK, let url = panel.url else { return }
+        onPick(url)
+    }
+}
+
 // MARK: - Segmented card picker (the White / Accent / Decibel style)
 
 struct CardOption: Identifiable, Equatable {

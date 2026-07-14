@@ -11,6 +11,7 @@ The look is gruvbox throughout (specifically inspired by VS Code's Gruvbox Dark 
 ## What you get
 
 - Region capture by tapping Command twice, or from the menubar.
+- Hold Option while you tap Command twice to save the capture to a folder of your choosing (Settings, Capture) instead of uploading it. The file lands on your clipboard too, so Command-V pastes the image itself.
 - Text-selection sharing by tapping Control twice. Code gets real syntax highlighting; prose gets clean wrapping. Either way it comes out as a framed window image.
 - Upload straight to your own S3-compatible bucket using a hand-rolled SigV4 signer (no heavyweight AWS SDK).
 - The link is on your clipboard the instant the object key is decided, so for normal screenshots you can paste before the upload even finishes.

@@ -1,17 +1,24 @@
 import AppKit
 
+/// Which "rider" modifiers were held on the tap that completed a gesture.
+struct GestureRiders {
+    var shift = false
+    var option = false
+}
+
 /// Global "tap a modifier twice" gestures via a passive CGEventTap:
 /// double-⌘ (capture) and double-⌃ (text share). Requires Input Monitoring
 /// permission. Listen-only, never swallows the user's events.
 ///
-/// Shift is allowed to ride along on the gesture: the fire callbacks receive
-/// whether Shift was held on the triggering tap, so callers can offer a
-/// "raw" variant (skip the styled window). Control / Option still disqualify.
+/// Shift and Option are allowed to ride along on double-⌘: the fire callback
+/// reports which were held, so callers can offer a "raw" variant (⇧, skip the
+/// styled window) and a "save locally" variant (⌥). Double-⌃ takes ⇧ only;
+/// Control and Option still disqualify each other.
 final class HotkeyMonitor {
-    /// Fired on double-⌘. Bool = was Shift held on the second tap.
-    var onCommandDouble: ((Bool) -> Void)?
-    /// Fired on double-⌃. Bool = was Shift held on the second tap.
-    var onControlDouble: ((Bool) -> Void)?
+    /// Fired on double-⌘, with the rider modifiers held on the second tap.
+    var onCommandDouble: ((GestureRiders) -> Void)?
+    /// Fired on double-⌃, with the rider modifiers held on the second tap (⇧ only).
+    var onControlDouble: ((GestureRiders) -> Void)?
     /// Fired on double-tap of ⌘+⌃ chord held simultaneously.
     var onCommandControlDouble: (() -> Void)?
     /// Max seconds between the two taps (read live from settings).
@@ -82,8 +89,10 @@ final class HotkeyMonitor {
         guard type == .flagsChanged else { return }
 
         let flags = event.flags
-        // Shift is intentionally NOT a disqualifier, it rides along as the "raw" modifier.
-        process(modifier: .maskCommand, others: [.maskControl, .maskAlternate],
+        // Shift is intentionally NOT a disqualifier, it rides along as the "raw"
+        // modifier. Option rides along on ⌘ too (the "save locally" variant), but
+        // still disqualifies ⌃ so ⌥⌃⌃ can't fire a text share.
+        process(modifier: .maskCommand, others: [.maskControl],
                 flags: flags, state: &cmd, fire: onCommandDouble)
         process(modifier: .maskControl, others: [.maskCommand, .maskAlternate],
                 flags: flags, state: &ctrl, fire: onControlDouble)
@@ -110,15 +119,16 @@ final class HotkeyMonitor {
     }
 
     private func process(modifier: CGEventFlags, others: CGEventFlags,
-                         flags: CGEventFlags, state: inout ModState, fire: ((Bool) -> Void)?) {
+                         flags: CGEventFlags, state: inout ModState, fire: ((GestureRiders) -> Void)?) {
         let down = flags.contains(modifier)
-        let shift = flags.contains(.maskShift)
+        let riders = GestureRiders(shift: flags.contains(.maskShift),
+                                   option: flags.contains(.maskAlternate) && !others.contains(.maskAlternate))
         let only = flags.intersection(others).isEmpty
         if down && !state.wasDown {
             let now = CFAbsoluteTimeGetCurrent()
             if state.armed, only, now - state.last <= gapProvider() {
                 state.armed = false
-                DispatchQueue.main.async { fire?(shift) }
+                DispatchQueue.main.async { fire?(riders) }
             } else {
                 state.armed = only
             }

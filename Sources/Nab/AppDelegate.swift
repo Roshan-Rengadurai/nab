@@ -53,16 +53,21 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
 
         // Gestures.
         hotkey.gapProvider = { [weak self] in (self?.settings.doubleCmdGap ?? 300) / 1000 }
-        hotkey.onCommandDouble = { [weak self] shiftHeld in
+        hotkey.onCommandDouble = { [weak self] riders in
             guard let self, !self.isOnboarding, self.settings.shortcutEnabled,
                   self.gestureAllowedInFrontmostApp() else { return }
-            self.capture(shift: shiftHeld)
+            // ⌥ rides along to save the capture to a folder instead of uploading.
+            if riders.option && self.settings.optionSaveLocally {
+                self.captureToFolder()
+            } else {
+                self.capture(shift: riders.shift)
+            }
         }
-        hotkey.onControlDouble = { [weak self] shiftHeld in
+        hotkey.onControlDouble = { [weak self] riders in
             guard let self, !self.isOnboarding, self.settings.textShareEnabled,
                   self.gestureAllowedInFrontmostApp() else { return }
             // ⇧ rides along to skip the styled window, when the setting allows it.
-            let raw = shiftHeld && self.settings.shiftRawShare
+            let raw = riders.shift && self.settings.shiftRawShare
             self.shareText(raw: raw)
         }
         hotkey.onCommandControlDouble = { [weak self] in
@@ -313,6 +318,57 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         pb.writeObjects([image])
         if settings.soundOnSuccess { NSSound(named: "Glass")?.play() }
         showToast(.success, "Image copied to clipboard")
+    }
+
+    /// ⌥ + double-⌘: capture a region and write it straight to the folder set in
+    /// Settings → Capture. No upload, no link. The saved file goes on the
+    /// clipboard as a file URL, so ⌘V pastes the image itself.
+    private func captureToFolder() {
+        let fmt = settings.captureFormat == "jpg" ? "jpg" : "png"
+        let dir = settings.saveFolderURL
+        do {
+            try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        } catch {
+            showToast(.error, "Can't write to \(settings.saveFolderDisplay): \(error.localizedDescription)")
+            return
+        }
+        let dest = Self.uniqueSaveURL(in: dir, ext: fmt)
+
+        // screencapture writes the file itself, so a cancelled selection simply
+        // leaves nothing at the destination.
+        let proc = Process()
+        proc.executableURL = URL(fileURLWithPath: "/usr/sbin/screencapture")
+        proc.arguments = ["-i", "-t", fmt, "-o", dest.path]
+        do { try proc.run(); proc.waitUntilExit() } catch {
+            showToast(.error, "Capture failed: \(error.localizedDescription)")
+            return
+        }
+        guard FileManager.default.fileExists(atPath: dest.path) else { return } // cancelled
+
+        let pb = NSPasteboard.general
+        pb.clearContents()
+        pb.writeObjects([dest as NSURL])
+        if settings.soundOnSuccess { NSSound(named: "Glass")?.play() }
+        showToast(.success, "Saved to \(settings.saveFolderDisplay)")
+    }
+
+    private static let saveNameFormatter: DateFormatter = {
+        let f = DateFormatter()
+        f.dateFormat = "yyyy-MM-dd 'at' HH.mm.ss"
+        return f
+    }()
+
+    /// "Nab 2026-07-14 at 09.41.32.png", with a counter suffix if a capture in
+    /// the same second already claimed the name.
+    private static func uniqueSaveURL(in dir: URL, ext: String) -> URL {
+        let stamp = saveNameFormatter.string(from: Date())
+        var url = dir.appendingPathComponent("Nab \(stamp).\(ext)")
+        var n = 2
+        while FileManager.default.fileExists(atPath: url.path) {
+            url = dir.appendingPathComponent("Nab \(stamp) (\(n)).\(ext)")
+            n += 1
+        }
+        return url
     }
 
     /// Capture a region and upload. Holding ⇧, during the gesture *or* at any

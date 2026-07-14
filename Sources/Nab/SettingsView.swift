@@ -173,6 +173,9 @@ struct GeneralPane: View {
             ToggleRow(title: "Hold ⇧ for a raw share",
                       subtitle: "⇧ + ⌃⌃ copies the direct file link instead of the preview page",
                       isOn: $settings.shiftRawShare)
+            ToggleRow(title: "Hold ⌥ to save to a folder",
+                      subtitle: "⌥ + ⌘⌘ saves the capture to disk instead of uploading. Folder lives in Capture.",
+                      isOn: $settings.optionSaveLocally)
             ToggleRow(title: "Tap ⌘⌃ twice to copy image",
                       subtitle: "Copies the captured image directly, no upload, no link",
                       isOn: $settings.cmdCtrlCopyImage)
@@ -436,6 +439,17 @@ struct CapturePane: View {
             ToggleRow(title: "Downscale retina @2x → @1x",
                       subtitle: "Smaller files; off keeps exact pixels",
                       isOn: $settings.retinaDownscale)
+
+            GroupLabel(text: "Save locally").padding(.top, 4)
+            ToggleRow(title: "Hold ⌥ to save to a folder",
+                      subtitle: "⌥ + ⌘⌘ saves the capture to disk instead of uploading",
+                      isOn: $settings.optionSaveLocally)
+            FolderRow(title: "Save folder",
+                      subtitle: "The file also lands on your clipboard, so ⌘V pastes it",
+                      path: settings.saveFolderDisplay,
+                      onPick: { settings.saveFolder = $0.path })
+                .opacity(settings.optionSaveLocally ? 1 : 0.4)
+                .disabled(!settings.optionSaveLocally)
         }
     }
 }
